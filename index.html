@@ -11,14 +11,14 @@
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=6">
-  <script src="./app.js?v=6" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=7">
+  <script src="./app.js?v=7" defer></script>
 </head>
 <body>
   <main>
     <header class="hero">
       <div class="brand"><img class="brand-mark" src="./icon.svg" alt=""><span>VOICE CARDS</span></div>
-      <div class="heading-row"><div><h1>診間語音<span>讓聲音，休息一下。</span></h1><p class="intro">點一下卡片，替你把話說清楚。</p></div><div class="voice-badge"><span class="voice-dot"></span>低沉男聲<span class="badge-divider">／</span>台灣華語</div></div>
+      <div class="heading-row"><div><h1>診間語音<span>讓聲音，休息一下。</span></h1><p class="intro">點一下卡片，替你把話說清楚。</p></div><div class="voice-badge"><span class="voice-dot"></span>卡片：低沉男聲<span class="badge-divider">／</span>台灣華語</div></div>
     </header>
     <section class="toolbar" aria-label="播放設定">
       <p><strong>24</strong> 句常用台詞<span class="toolbar-hint"> · 依點選順序連續播放</span></p>
@@ -29,7 +29,18 @@
       <label for="volume">音量 <output id="volume-value" for="volume">100%</output><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
       <p>整體音量也可用 iPad 側邊按鍵調整。</p>
     </section>
-    <nav id="flow-nav" class="flow-nav" aria-label="看診流程分類"></nav>
+    <nav id="flow-nav" class="flow-nav" aria-label="看診流程分類"><a href="#typing" class="typing-link">自由輸入</a></nav>
+    <section id="typing" class="free-typing phrase-group" aria-labelledby="typing-title">
+      <div class="group-heading"><h2 id="typing-title">自由輸入</h2><span class="group-count">卡片沒有的話，在這裡說</span></div>
+      <form id="custom-form" autocomplete="off">
+        <label class="text-label" for="custom-text">想說的話</label>
+        <textarea id="custom-text" rows="3" placeholder="例如：請先在外面稍等，報告出來後會再通知您。" autocomplete="off" aria-describedby="custom-help"></textarea>
+        <div class="custom-options"><label for="custom-voice">朗讀聲音</label><select id="custom-voice" aria-describedby="voice-status"></select><button id="reload-voices" class="quiet-button" type="button" hidden>重新讀取聲音</button></div>
+        <p id="voice-status" class="custom-note" role="status">正在讀取裝置語音…</p>
+        <div class="custom-actions"><button id="custom-submit" class="speak-button" type="submit" disabled>加入播放</button><button id="custom-clear" class="quiet-button" type="button">清除文字</button><span id="custom-status" role="status" aria-live="polite">可與卡片一起依序播放。</span></div>
+        <p id="custom-help" class="custom-note">送出後修改或清除文字，不影響已排入的內容。文字不會儲存到網站。</p>
+      </form>
+    </section>
     <div id="cards" class="card-groups"></div>
     <noscript><p class="notice">請開啟 Safari 的 JavaScript，才能點選卡片播放。</p></noscript>
     <footer class="page-footer"><span>每一句，都可以慢慢說。</span><span id="offline-status">合成男聲語音</span></footer>
@@ -38,7 +49,7 @@
     <div class="player-inner">
       <div class="player-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       <div class="player-copy"><span id="playback-label">準備好了</span><p id="now-playing" role="status" aria-live="polite" aria-atomic="true">點選任一卡片開始播放</p></div>
-      <button id="stop" class="stop-button" type="button" disabled><span aria-hidden="true">■</span> 停止並清空</button>
+      <div class="player-actions"><button id="continue" class="stop-button continue-button" type="button" hidden>繼續播放</button><button id="stop" class="stop-button" type="button" disabled><span aria-hidden="true">■</span> 停止並清空</button></div>
     </div>
   </aside>
   <audio id="audio" preload="auto" playsinline></audio>

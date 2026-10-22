@@ -37,19 +37,33 @@ const audio = document.querySelector('#audio');
 const cards = document.querySelector('#cards');
 const flowNav = document.querySelector('#flow-nav');
 const stopButton = document.querySelector('#stop');
+const continueButton = document.querySelector('#continue');
 const nowPlaying = document.querySelector('#now-playing');
 const playbackLabel = document.querySelector('#playback-label');
 const rateInput = document.querySelector('#rate');
 const volumeInput = document.querySelector('#volume');
+const customText = document.querySelector('#custom-text');
+const customSubmit = document.querySelector('#custom-submit');
+const voiceSelect = document.querySelector('#custom-voice');
+const voiceStatus = document.querySelector('#voice-status');
+const synth = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window ? window.speechSynthesis : null;
+let voices = [];
+let preferredVoice = '';
 let audioContext;
 let gainNode;
 let activeCard;
+let activePhrase;
+let activeUtterance;
 let playRequest = 0;
 let playbackState = '準備好了';
 const queue = [];
 
 function updateQueue() {
   playbackLabel.textContent = playbackState + (queue.length ? ' · 待播 ' + queue.length + ' 句' : '');
+  const typedCount = queue.filter(item => !item.phrase.file).length;
+  document.querySelector('#custom-status').textContent = activePhrase && !activePhrase.file
+    ? '自由輸入：' + playbackState + (typedCount ? ' · 另有 ' + typedCount + ' 句待播' : '')
+    : typedCount ? '自由輸入待播 ' + typedCount + ' 句' : '可與卡片一起依序播放。';
   for (const card of cards.querySelectorAll('.card')) {
     const count = queue.filter(item => item.card === card).length;
     const position = queue.findIndex(item => item.card === card) + 1;
@@ -67,6 +81,9 @@ function clearActive() {
     activeCard.querySelector('.card-caption').textContent = '點一下播放';
     activeCard = null;
   }
+  activePhrase = null;
+  activeUtterance = null;
+  continueButton.hidden = true;
   document.body.classList.remove('is-playing');
   stopButton.disabled = true;
 }
@@ -75,11 +92,13 @@ function stopPlayback() {
   playRequest += 1;
   queue.length = 0;
   audio.pause();
+  if (synth) synth.cancel();
   if (Number.isFinite(audio.duration)) audio.currentTime = 0;
   clearActive();
   playbackState = '已停止';
   updateQueue();
   nowPlaying.textContent = '點選任一卡片開始播放';
+  nowPlaying.classList.remove('is-custom');
 }
 
 function prepareAudio() {
@@ -108,56 +127,164 @@ function applySettings() {
   document.querySelector('#volume-value').textContent = Math.round(Number(volumeInput.value) * 100) + '%';
 }
 
-function showError(request) {
+function showError(request, message = '待播已清空，請確認網路連線後再點一次卡片。') {
   if (request !== playRequest) return;
   stopPlayback();
   playbackState = '無法播放';
   updateQueue();
-  nowPlaying.textContent = '待播已清空，請確認網路連線後再點一次卡片。';
+  nowPlaying.textContent = message;
+}
+
+function finishPlayback(request) {
+  if (request !== playRequest) return;
+  clearActive();
+  if (queue.length) {
+    const next = queue.shift();
+    playPhrase(next.phrase, next.card);
+  } else {
+    playbackState = '播放完畢';
+    updateQueue();
+  }
+}
+
+function showContinue(request) {
+  if (request !== playRequest) return;
+  playbackState = '點一下繼續播放';
+  continueButton.hidden = false;
+  updateQueue();
+}
+
+function playSpeech(phrase, request) {
+  const availableVoices = synth ? synth.getVoices().filter(item => item.localService) : [];
+  const voice = availableVoices.find(item => item.voiceURI === phrase.voiceURI)
+    || availableVoices.find(item => item.name === phrase.voiceName && item.lang === phrase.voiceLang);
+  if (!voice) {
+    showError(request, '找不到所選的裝置語音。待播已清空，請重新選擇聲音後再試。');
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(phrase.text);
+  activeUtterance = utterance;
+  utterance.voice = voice;
+  utterance.lang = voice.lang;
+  utterance.rate = Number(rateInput.value);
+  utterance.volume = Number(volumeInput.value);
+  utterance.pitch = 0.8;
+  continueButton.hidden = false;
+  utterance.onstart = () => {
+    if (request !== playRequest) return;
+    continueButton.hidden = true;
+    playbackState = '正在朗讀';
+    updateQueue();
+    document.body.classList.add('is-playing');
+  };
+  utterance.onend = () => finishPlayback(request);
+  utterance.onerror = event => {
+    if (event.error === 'not-allowed') showContinue(request);
+    else showError(request, event.error === 'text-too-long'
+      ? '文字太長，請分成幾句再播放。待播已清空。'
+      : '文字朗讀未成功，待播已清空。請重新選擇聲音後再試。');
+  };
+  synth.resume();
+  synth.speak(utterance);
 }
 
 function playPhrase(phrase, card) {
   const request = ++playRequest;
   audio.pause();
+  if (activeUtterance) synth.cancel();
   clearActive();
-  const audioReady = prepareAudio();
+  activePhrase = phrase;
   activeCard = card;
-  card.classList.add('is-active');
-  card.setAttribute('aria-pressed', 'true');
-  playbackState = '載入語音';
+  if (card) {
+    card.classList.add('is-active');
+    card.setAttribute('aria-pressed', 'true');
+  }
+  playbackState = phrase.file ? '載入語音' : '準備朗讀';
   updateQueue();
   nowPlaying.textContent = phrase.text;
+  nowPlaying.classList.toggle('is-custom', !phrase.file);
   stopButton.disabled = false;
+  if (!phrase.file) {
+    playSpeech(phrase, request);
+    return;
+  }
+  const audioReady = prepareAudio();
   audio.src = './audio/' + phrase.file + '.mp3';
   applySettings();
   audio.onerror = () => showError(request);
   audio.onended = () => {
-    if (request !== playRequest || !audio.ended) return;
-    clearActive();
-    if (queue.length) {
-      const next = queue.shift();
-      playPhrase(next.phrase, next.card);
-    } else {
-      playbackState = '播放完畢';
-      updateQueue();
-    }
+    if (audio.ended) finishPlayback(request);
   };
   Promise.all([audioReady, audio.play()]).then(() => {
     if (request !== playRequest) return;
     playbackState = '正在播放';
     updateQueue();
     document.body.classList.add('is-playing');
-  }).catch(() => showError(request));
+  }).catch(error => {
+    if (error.name === 'NotAllowedError') showContinue(request);
+    else showError(request);
+  });
 }
 
-function enqueuePhrase(phrase, card) {
-  if (activeCard) {
+function enqueuePhrase(phrase, card = null) {
+  if (activePhrase) {
     queue.push({ phrase, card });
     updateQueue();
   } else {
     playPhrase(phrase, card);
   }
 }
+
+function updateCustomSubmit() {
+  customSubmit.disabled = !customText.value.trim() || !voices.length;
+}
+
+function refreshVoices() {
+  const selected = voiceSelect.value || preferredVoice;
+  const previous = voices.find(voice => voice.voiceURI === selected);
+  voices = synth ? synth.getVoices().filter(voice => voice.localService && /^zh(?:[-_]|$)/i.test(voice.lang)) : [];
+  voices.sort((a, b) => Number(/^zh[-_]TW$/i.test(b.lang)) - Number(/^zh[-_]TW$/i.test(a.lang)) || Number(b.default) - Number(a.default));
+  voiceSelect.replaceChildren();
+  for (const voice of voices) {
+    const option = document.createElement('option');
+    option.value = voice.voiceURI;
+    option.textContent = voice.name + '（' + voice.lang + '）';
+    voiceSelect.append(option);
+  }
+  const matching = voices.find(voice => voice.voiceURI === selected)
+    || voices.find(voice => voice.name === previous?.name && voice.lang === previous?.lang);
+  if (matching) voiceSelect.value = matching.voiceURI;
+  voiceSelect.disabled = !voices.length;
+  document.querySelector('#reload-voices').hidden = !synth || voices.length > 0;
+  voiceStatus.textContent = !synth ? '此瀏覽器不支援文字朗讀。請用 iPad 的 Safari 開啟；固定卡片仍可使用。'
+    : !voices.length ? '尚未找到裝置上的中文語音。請先下載中文語音，再點「重新讀取聲音」。'
+    : '使用裝置上的中文語音，預設較低音調；聲線可能與固定卡片不同。';
+  updateCustomSubmit();
+}
+
+try { preferredVoice = localStorage.getItem('voice-card-voice') || ''; } catch {}
+if (synth) synth.addEventListener('voiceschanged', refreshVoices);
+refreshVoices();
+voiceSelect.addEventListener('change', () => {
+  preferredVoice = voiceSelect.value;
+  try { localStorage.setItem('voice-card-voice', preferredVoice); } catch {}
+});
+document.querySelector('#reload-voices').addEventListener('click', refreshVoices);
+customText.addEventListener('input', updateCustomSubmit);
+document.querySelector('#custom-clear').addEventListener('click', () => {
+  customText.value = '';
+  updateCustomSubmit();
+  customText.focus();
+});
+document.querySelector('#custom-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const text = customText.value.trim();
+  const voiceURI = voiceSelect.value;
+  const voice = voices.find(voice => voice.voiceURI === voiceURI);
+  if (!text || !voice) return;
+  enqueuePhrase({ text, voiceURI, voiceName: voice.name, voiceLang: voice.lang });
+  customText.blur();
+});
 
 let cardNumber = 0;
 groups.forEach((group, index) => {
@@ -191,9 +318,18 @@ groups.forEach((group, index) => {
 new ResizeObserver(() => {
   document.documentElement.style.setProperty('--flow-nav-height', flowNav.offsetHeight + 'px');
 }).observe(flowNav);
+function updateTypingLayout() {
+  document.body.classList.toggle('compact-typing', (window.visualViewport?.height || window.innerHeight) < 600);
+}
+window.visualViewport?.addEventListener('resize', updateTypingLayout);
+window.addEventListener('resize', updateTypingLayout);
+updateTypingLayout();
 
 audio.addEventListener('loadedmetadata', applySettings);
 stopButton.addEventListener('click', stopPlayback);
+continueButton.addEventListener('click', () => {
+  if (activePhrase) playPhrase(activePhrase, activeCard);
+});
 document.querySelector('#settings-toggle').addEventListener('click', event => {
   const settings = document.querySelector('#settings');
   settings.hidden = !settings.hidden;
@@ -222,8 +358,8 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') stop
 if ('serviceWorker' in navigator) {
   const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.cache === 'clinic-voice-cards-v6') {
-      document.querySelector('#offline-status').textContent = '語音已備妥 · 可離線使用';
+    if (event.data?.cache === 'clinic-voice-cards-v7') {
+      document.querySelector('#offline-status').textContent = '固定卡片已備妥 · 可離線使用';
     }
   });
   navigator.serviceWorker.addEventListener('controllerchange', checkOfflineReady);
