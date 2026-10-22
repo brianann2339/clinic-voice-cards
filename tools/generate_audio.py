@@ -28,6 +28,15 @@ PHRASES = (
     ("09-pain.mp3", "有哪邊會痛嗎？"),
     ("10-breath.mp3", "呼吸會喘嗎？"),
     ("11-inflammation.mp3", "你這邊發炎了。"),
+    ("12-xray-no-fracture.mp3", "X光都正常，沒有骨折。"),
+    ("13-xray-normal.mp3", "X光都正常。"),
+    ("14-introduction.mp3", "你好，我是侯岳岑醫師，我今天喉嚨沒有聲音，所以只能用語音跟您對話，不好意思。"),
+    ("15-im-injection.mp3", "等等幫你打個肌肉針好嗎？"),
+    ("16-questions.mp3", "有沒有什麼問題？"),
+    ("17-oral-meds.mp3", "那我讓你帶口服藥回家囉。"),
+    ("18-suture.mp3", "這個傷口要縫。"),
+    ("19-keep-dry.mp3", "傷口回去避免碰水。"),
+    ("20-tetanus.mp3", "五年內打過破傷風疫苗嗎？"),
 )
 
 

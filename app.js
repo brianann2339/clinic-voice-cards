@@ -9,7 +9,16 @@ const phrases = [
   { file: '08-unwell', text: '你今天哪裡不舒服呢？' },
   { file: '09-pain', text: '有哪邊會痛嗎？' },
   { file: '10-breath', text: '呼吸會喘嗎？' },
-  { file: '11-inflammation', text: '你這邊發炎了。' }
+  { file: '11-inflammation', text: '你這邊發炎了。' },
+  { file: '12-xray-no-fracture', text: 'X光都正常，沒有骨折。' },
+  { file: '13-xray-normal', text: 'X光都正常。' },
+  { file: '14-introduction', text: '你好，我是侯岳岑醫師，我今天喉嚨沒有聲音，所以只能用語音跟您對話，不好意思。' },
+  { file: '15-im-injection', text: '等等幫你打個肌肉針好嗎？' },
+  { file: '16-questions', text: '有沒有什麼問題？' },
+  { file: '17-oral-meds', text: '那我讓你帶口服藥回家囉。' },
+  { file: '18-suture', text: '這個傷口要縫。' },
+  { file: '19-keep-dry', text: '傷口回去避免碰水。' },
+  { file: '20-tetanus', text: '五年內打過破傷風疫苗嗎？' }
 ];
 
 const audio = document.querySelector('#audio');
@@ -144,7 +153,20 @@ window.addEventListener('pagehide', stopPlayback);
 document.addEventListener('keydown', event => { if (event.key === 'Escape') stopPlayback(); });
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(async registration => {
+    const worker = registration.installing || registration.waiting;
+    if (worker && worker.state !== 'activated') {
+      await new Promise((resolve, reject) => {
+        const checkState = () => {
+          if (worker.state === 'activated') resolve();
+          if (worker.state === 'redundant') reject(new Error('語音離線更新未完成'));
+        };
+        worker.addEventListener('statechange', checkState);
+        checkState();
+      });
+    }
+    return navigator.serviceWorker.ready;
+  }).then(() => {
     document.querySelector('#offline-status').textContent = '語音已備妥 · 可離線使用';
   }).catch(() => {});
 }
