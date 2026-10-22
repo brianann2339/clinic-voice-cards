@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17594f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="description" content="點選大字卡片，以低沉台灣華語男聲播放診間常用台詞。">
+  <title>診間語音 · 點一下，替你說</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="brand"><img class="brand-mark" src="./icon.svg" alt=""><span>VOICE CARDS</span></div>
+      <div class="heading-row"><div><h1>診間語音<span>讓聲音，休息一下。</span></h1><p class="intro">點一下卡片，替你把話說清楚。</p></div><div class="voice-badge"><span class="voice-dot"></span>低沉男聲<span class="badge-divider">／</span>台灣華語</div></div>
+    </header>
+    <section class="toolbar" aria-label="播放設定">
+      <p><strong>11</strong> 句常用台詞<span class="toolbar-hint"> · 點選另一張即可切換</span></p>
+      <button id="settings-toggle" class="quiet-button" type="button" aria-expanded="false" aria-controls="settings">播放設定 <span aria-hidden="true">⌄</span></button>
+    </section>
+    <section id="settings" class="settings" aria-label="語速與音量" hidden>
+      <label for="rate">語速 <output id="rate-value" for="rate">1.00×</output><input id="rate" type="range" min="0.8" max="1.2" step="0.05" value="1"></label>
+      <label for="volume">音量 <output id="volume-value" for="volume">100%</output><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+      <p>整體音量也可用 iPad 側邊按鍵調整。</p>
+    </section>
+    <section id="cards" class="cards" aria-label="點選台詞播放語音"></section>
+    <noscript><p class="notice">請開啟 Safari 的 JavaScript，才能點選卡片播放。</p></noscript>
+    <footer class="page-footer"><span>每一句，都可以慢慢說。</span><span id="offline-status">合成男聲語音</span></footer>
+  </main>
+  <aside class="player" aria-label="播放控制">
+    <div class="player-inner">
+      <div class="player-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="player-copy"><span id="playback-label">準備好了</span><p id="now-playing" role="status" aria-live="polite" aria-atomic="true">點選任一卡片開始播放</p></div>
+      <button id="stop" class="stop-button" type="button" disabled><span aria-hidden="true">■</span> 停止播放</button>
+    </div>
+  </aside>
+  <audio id="audio" preload="auto" playsinline></audio>
+</body>
+</html>
