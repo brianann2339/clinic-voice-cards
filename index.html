@@ -11,8 +11,8 @@
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=8">
-  <script src="./app.js?v=8" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=10">
+  <script src="./app.js?v=10" defer></script>
 </head>
 <body>
   <main>
@@ -30,8 +30,8 @@
       <p>整體音量也可用 iPad 側邊按鍵調整。</p>
     </section>
     <nav id="flow-nav" class="flow-nav" aria-label="看診流程分類"><a href="#typing" class="typing-link">自由輸入</a></nav>
-    <section id="typing" class="free-typing phrase-group" aria-labelledby="typing-title">
-      <div class="group-heading"><h2 id="typing-title">自由輸入</h2><span class="group-count">卡片沒有的話，在這裡說</span></div>
+    <details id="typing" class="free-typing phrase-group" aria-labelledby="typing-title">
+      <summary class="typing-summary"><span id="typing-title">自由輸入</span><span class="typing-hint">卡片沒有的話，在這裡說</span><span class="typing-toggle"><span class="typing-expand">展開</span><span class="typing-collapse">收起</span><svg aria-hidden="true" viewBox="0 0 12 8"><path d="m1 1 5 5 5-5"/></svg></span></summary>
       <form id="custom-form" autocomplete="off">
         <label class="text-label" for="custom-text">想說的話</label>
         <textarea id="custom-text" rows="3" placeholder="例如：請先在外面稍等，報告出來後會再通知您。" autocomplete="off" aria-describedby="custom-help"></textarea>
@@ -40,7 +40,7 @@
         <div class="custom-actions"><button id="custom-submit" class="speak-button" type="submit" disabled>加入播放</button><button id="custom-clear" class="quiet-button" type="button">清除文字</button><span id="custom-status" role="status" aria-live="polite">可與卡片一起依序播放。</span></div>
         <p id="custom-help" class="custom-note">送出後修改或清除文字，不影響已排入的內容。文字不會儲存到網站。</p>
       </form>
-    </section>
+    </details>
     <div id="cards" class="card-groups"></div>
     <noscript><p class="notice">請開啟 Safari 的 JavaScript，才能點選卡片播放。</p></noscript>
     <footer class="page-footer"><span>每一句，都可以慢慢說。</span><span id="offline-status">合成男聲語音</span></footer>

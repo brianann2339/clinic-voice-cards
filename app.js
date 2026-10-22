@@ -283,6 +283,10 @@ document.querySelector('#custom-form').addEventListener('submit', event => {
   customText.blur();
 });
 
+const typing = document.querySelector('#typing');
+typing.open = false;
+flowNav.querySelector('.typing-link').addEventListener('click', () => { typing.open = true; });
+
 let cardNumber = 0;
 groups.forEach((group, index) => {
   const link = document.createElement('a');
@@ -355,7 +359,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') stop
 if ('serviceWorker' in navigator) {
   const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.cache === 'clinic-voice-cards-v8') {
+    if (event.data?.cache === 'clinic-voice-cards-v10') {
       document.querySelector('#offline-status').textContent = '固定卡片已備妥 · 可離線使用';
     }
   });
