@@ -22,7 +22,7 @@
 
 純 HTML、CSS、JavaScript，無需建置。以 `python3 -m http.server 8765` 預覽，GitHub Pages 使用 main 分支根目錄。
 
-[新男聲試聽](voice-preview.html) 僅提供本機產生的 Kokoro `zm_yunjian` 預錄短句，供使用者評估清晰度，不代表即時合成已整合或已通過 iPad 測試。試聽頁不載入語音模型；正式自由輸入仍使用上述 v11 引擎。
+[新版語音試聽](voice-preview.html) 提供本機產生的 MeloTTS 中文聲音及 Kokoro `zm_yunjian` 男聲，可切換同句音檔比較。Melo 音檔僅調整固定增益以接近男聲音量，未改語速或音高。這些預錄短句供使用者評估清晰度與自然度，不代表即時合成已整合或已通過 iPad 測試。試聽頁不載入語音模型；正式自由輸入仍使用上述 v11 引擎。
 
 語音生成方式見 `tools/generate_audio.py`；固定使用 Microsoft `zh-TW-YunJheNeural` 男聲，稍慢語速與降低音高。語音檔不包含任何實際病人資料。使用時不呼叫語音生成服務。
 

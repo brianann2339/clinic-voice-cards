@@ -4,38 +4,49 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#17594f">
-  <title>新男聲試聽 · 診間語音</title>
+  <title>新版語音試聽 · 診間語音</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css?v=11">
   <style>
-    main{max-width:760px;padding-bottom:48px}.preview-card{margin-top:32px;padding:28px;border:1px solid var(--line);border-radius:20px;background:var(--white)}.preview-card h2{font-size:28px;line-height:1.5;margin:0 0 24px}.preview-card audio{display:block;width:100%;margin-top:18px}.preview-note{font-size:15px;line-height:1.8;color:var(--muted)}.preview-link{display:inline-flex;align-items:center;min-height:44px;color:var(--green);text-underline-offset:4px}.preview-card button{width:100%;min-height:56px}.preview-status{min-height:24px;font-size:14px;color:var(--muted);margin:14px 0 0}@media(max-width:540px){.preview-card{padding:22px}.preview-card h2{font-size:25px}}
+    main{max-width:760px;padding-bottom:48px}.voice-choice{border:0;margin:24px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}.voice-choice legend{margin-bottom:12px;font-size:14px;font-weight:600}.voice-choice label{display:flex;align-items:center;gap:8px;min-height:48px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;background:var(--white);cursor:pointer}.voice-choice input{accent-color:var(--green);width:18px;height:18px;margin:0}.preview-card{margin-top:24px;padding:28px;border:1px solid var(--line);border-radius:20px;background:var(--white)}.preview-card h2{font-size:28px;line-height:1.5;margin:0 0 24px}.preview-card audio{display:block;width:100%;margin-top:18px}.preview-note{font-size:15px;line-height:1.8;color:var(--muted)}.preview-link{display:inline-flex;align-items:center;min-height:44px;color:var(--green);text-underline-offset:4px}.preview-card button{width:100%;min-height:56px}.preview-status{min-height:24px;font-size:14px;color:var(--muted);margin:14px 0 0}@media(max-width:540px){.preview-card{padding:22px}.preview-card h2{font-size:25px}}
   </style>
 </head>
 <body>
   <main>
     <header class="hero">
       <div class="brand"><img class="brand-mark" src="./icon.svg" alt=""><span>VOICE CARDS</span></div>
-      <div class="heading-row"><h1>新男聲試聽<span>先聽聽，字句是否清楚。</span></h1></div>
-      <p class="preview-note">這是預先產生的短句音檔，用來確認聲音是否聽得懂。自由輸入尚未換成這個聲音；這裡的播放速度也不代表即時合成速度。</p>
+      <div class="heading-row"><h1>新版語音試聽<span>同一句話，換個聲音。</span></h1></div>
+      <p class="preview-note">先比較字句是否清楚、聲音是否自然。這些是預錄音檔，自由輸入尚未換聲；播放等待時間也不代表即時合成速度。</p>
     </header>
+    <fieldset class="voice-choice"><legend>選擇試聽聲音</legend><label><input type="radio" name="preview-voice" value="melo" checked>新聲音</label><label><input type="radio" name="preview-voice" value="kokoro">上次男聲</label></fieldset>
     <section class="preview-card" aria-labelledby="sample-title">
       <h2 id="sample-title">你好，請稍等。</h2>
-      <button class="speak-button" id="sample-play" type="button">▶ 播放新男聲</button>
-      <audio id="sample-audio" controls preload="none" playsinline aria-label="新男聲：你好，請稍等。" src="./audio/preview-kokoro-greeting.wav"></audio>
+      <button class="speak-button" id="sample-play" type="button">▶ 播放問候語</button>
+      <audio id="sample-audio" controls preload="none" playsinline aria-label="試聽：你好，請稍等。" src="./audio/preview-melo-greeting.wav" data-melo="./audio/preview-melo-greeting.wav" data-kokoro="./audio/preview-kokoro-greeting.wav"></audio>
       <p class="preview-status" id="sample-status" role="status" aria-live="polite">請在 iPad Safari 點一下播放。</p>
     </section>
     <section class="preview-card" aria-labelledby="clinic-title">
       <h2 id="clinic-title">X光都正常，沒有骨折。</h2>
       <button class="speak-button" type="button">▶ 播放診間短句</button>
-      <audio controls preload="none" playsinline aria-label="新男聲：X光都正常，沒有骨折。" src="./audio/preview-kokoro-xray.wav"></audio>
+      <audio controls preload="none" playsinline aria-label="試聽：X光都正常，沒有骨折。" src="./audio/preview-melo-xray.wav" data-melo="./audio/preview-melo-xray.wav" data-kokoro="./audio/preview-kokoro-xray.wav"></audio>
       <p class="preview-status" role="status" aria-live="polite">再聽一句實際會用到的話。</p>
     </section>
     <p class="preview-note">試聽時請留意每個字是否清楚、音色是否適合在診間使用。這一頁不需要下載完整語音模型。</p>
     <a class="preview-link" href="./?v=11#typing">← 回到診間語音卡片</a>
-    <footer class="page-footer"><span>試聽聲音：<a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a> · 雲健男聲</span><span>預錄試聽</span></footer>
+    <footer class="page-footer"><span>新聲音：<a href="https://github.com/myshell-ai/MeloTTS">MeloTTS</a> · 上次男聲：<a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a></span><span>預錄試聽</span></footer>
   </main>
   <script>
     const samples = [...document.querySelectorAll('audio')];
+    document.querySelectorAll('[name="preview-voice"]').forEach(input => {
+      input.addEventListener('change', () => {
+        samples.forEach(sample => {
+          sample.pause();
+          sample.src = sample.dataset[input.value];
+          sample.load();
+          sample.closest('.preview-card').querySelector('.preview-status').textContent = '聲音已切換，請點一下播放。';
+        });
+      });
+    });
     document.querySelectorAll('.preview-card').forEach(card => {
       const sample = card.querySelector('audio');
       const status = card.querySelector('.preview-status');
