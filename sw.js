@@ -1,13 +1,17 @@
-const CACHE = 'clinic-voice-cards-v4';
-const ASSETS = ['./', './index.html', './styles.css', './app.js?v=4', './icon.svg', './apple-touch-icon.png', './icon-512.png', './manifest.webmanifest',
+const CACHE = 'clinic-voice-cards-v5';
+const ASSETS = ['./', './index.html', './styles.css?v=5', './app.js?v=5', './icon.svg', './apple-touch-icon.png', './icon-512.png', './manifest.webmanifest',
   '01-results', '02-cancer', '03-fracture', '04-flu-a', '05-blood', '06-iv', '07-test', '08-unwell', '09-pain', '10-breath', '11-inflammation',
-  '12-xray-no-fracture', '13-xray-normal', '14-introduction', '15-im-injection', '16-questions', '17-oral-meds', '18-suture', '19-keep-dry', '20-tetanus'
+  '12-xray-no-fracture', '13-xray-normal', '14-introduction', '15-im-injection', '16-questions', '17-oral-meds', '18-suture', '19-keep-dry', '20-tetanus',
+  '21-ecg', '22-ct-consent', '23-xray', '24-normal-results'
 ].map(path => path.startsWith('./') ? path : './audio/' + path + '.mp3');
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS.map(path => new Request(path, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('clinic-voice-cards-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
+});
+self.addEventListener('message', event => {
+  if (event.data === 'check-offline-ready') event.source?.postMessage({ cache: CACHE });
 });
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;

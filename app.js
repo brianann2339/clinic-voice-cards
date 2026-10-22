@@ -18,7 +18,11 @@ const phrases = [
   { file: '17-oral-meds', text: '那我讓你帶口服藥回家囉。' },
   { file: '18-suture', text: '這個傷口要縫。' },
   { file: '19-keep-dry', text: '傷口回去避免碰水。' },
-  { file: '20-tetanus', text: '五年內打過破傷風疫苗嗎？' }
+  { file: '20-tetanus', text: '五年內打過破傷風疫苗嗎？' },
+  { file: '21-ecg', text: '我們等等幫你做心電圖。' },
+  { file: '22-ct-consent', text: '我們等等幫你做電腦斷層，再幫我簽個同意書。' },
+  { file: '23-xray', text: '我們等等幫你照X光。' },
+  { file: '24-normal-results', text: '剛才檢查結果都正常，別太擔心。' }
 ];
 
 const audio = document.querySelector('#audio');
@@ -32,6 +36,20 @@ let audioContext;
 let gainNode;
 let activeCard;
 let playRequest = 0;
+let playbackState = '準備好了';
+const queue = [];
+
+function updateQueue() {
+  playbackLabel.textContent = playbackState + (queue.length ? ' · 待播 ' + queue.length + ' 句' : '');
+  for (const card of cards.children) {
+    const count = queue.filter(item => item.card === card).length;
+    const position = queue.findIndex(item => item.card === card) + 1;
+    card.classList.toggle('is-queued', count > 0);
+    card.querySelector('.card-caption').textContent = card === activeCard
+      ? '正在播放' + (count ? ' · 另排 ' + count + ' 次' : '')
+      : count ? '待播第 ' + position + ' 句' + (count > 1 ? ' · 共 ' + count + ' 次' : '') : '點一下播放';
+  }
+}
 
 function clearActive() {
   if (activeCard) {
@@ -46,10 +64,12 @@ function clearActive() {
 
 function stopPlayback() {
   playRequest += 1;
+  queue.length = 0;
   audio.pause();
   if (Number.isFinite(audio.duration)) audio.currentTime = 0;
   clearActive();
-  playbackLabel.textContent = '已停止';
+  playbackState = '已停止';
+  updateQueue();
   nowPlaying.textContent = '點選任一卡片開始播放';
 }
 
@@ -81,10 +101,10 @@ function applySettings() {
 
 function showError(request) {
   if (request !== playRequest) return;
-  audio.pause();
-  clearActive();
-  playbackLabel.textContent = '尚未播放';
-  nowPlaying.textContent = '請確認網路連線，再點一次卡片。';
+  stopPlayback();
+  playbackState = '無法播放';
+  updateQueue();
+  nowPlaying.textContent = '待播已清空，請確認網路連線後再點一次卡片。';
 }
 
 function playPhrase(phrase, card) {
@@ -95,18 +115,39 @@ function playPhrase(phrase, card) {
   activeCard = card;
   card.classList.add('is-active');
   card.setAttribute('aria-pressed', 'true');
-  card.querySelector('.card-caption').textContent = '正在播放';
-  playbackLabel.textContent = '載入語音';
+  playbackState = '載入語音';
+  updateQueue();
   nowPlaying.textContent = phrase.text;
   stopButton.disabled = false;
   audio.src = './audio/' + phrase.file + '.mp3';
   applySettings();
   audio.onerror = () => showError(request);
+  audio.onended = () => {
+    if (request !== playRequest || !audio.ended) return;
+    clearActive();
+    if (queue.length) {
+      const next = queue.shift();
+      playPhrase(next.phrase, next.card);
+    } else {
+      playbackState = '播放完畢';
+      updateQueue();
+    }
+  };
   Promise.all([audioReady, audio.play()]).then(() => {
     if (request !== playRequest) return;
-    playbackLabel.textContent = '正在播放';
+    playbackState = '正在播放';
+    updateQueue();
     document.body.classList.add('is-playing');
   }).catch(() => showError(request));
+}
+
+function enqueuePhrase(phrase, card) {
+  if (activeCard) {
+    queue.push({ phrase, card });
+    updateQueue();
+  } else {
+    playPhrase(phrase, card);
+  }
 }
 
 phrases.forEach((phrase, index) => {
@@ -117,15 +158,11 @@ phrases.forEach((phrase, index) => {
   card.setAttribute('aria-pressed', 'false');
   card.innerHTML = '<span class="card-top"><span class="card-number">' + String(index + 1).padStart(2, '0') + '</span><span class="card-play" aria-hidden="true"><svg viewBox="0 0 12 14"><path fill="currentColor" d="M1 0 12 7 1 14Z"/></svg></span></span><span class="card-text"></span><span class="card-caption" aria-hidden="true">點一下播放</span>';
   card.querySelector('.card-text').textContent = phrase.text;
-  card.addEventListener('click', () => playPhrase(phrase, card));
+  card.addEventListener('click', () => enqueuePhrase(phrase, card));
   cards.append(card);
 });
 
 audio.addEventListener('loadedmetadata', applySettings);
-audio.addEventListener('ended', () => {
-  clearActive();
-  playbackLabel.textContent = '播放完畢';
-});
 stopButton.addEventListener('click', stopPlayback);
 document.querySelector('#settings-toggle').addEventListener('click', event => {
   const settings = document.querySelector('#settings');
@@ -153,20 +190,14 @@ window.addEventListener('pagehide', stopPlayback);
 document.addEventListener('keydown', event => { if (event.key === 'Escape') stopPlayback(); });
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(async registration => {
-    const worker = registration.installing || registration.waiting;
-    if (worker && worker.state !== 'activated') {
-      await new Promise((resolve, reject) => {
-        const checkState = () => {
-          if (worker.state === 'activated') resolve();
-          if (worker.state === 'redundant') reject(new Error('語音離線更新未完成'));
-        };
-        worker.addEventListener('statechange', checkState);
-        checkState();
-      });
+  const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.cache === 'clinic-voice-cards-v5') {
+      document.querySelector('#offline-status').textContent = '語音已備妥 · 可離線使用';
     }
-    return navigator.serviceWorker.ready;
-  }).then(() => {
-    document.querySelector('#offline-status').textContent = '語音已備妥 · 可離線使用';
-  }).catch(() => {});
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', checkOfflineReady);
+  checkOfflineReady();
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then(() => navigator.serviceWorker.ready).then(checkOfflineReady).catch(() => {});
 }
