@@ -7,3 +7,5 @@
 @media(max-width:900px){main{padding:30px 28px 150px}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.card{min-height:166px}.heading-row{align-items:flex-start;flex-direction:column;gap:18px}h1{font-size:37px}.toolbar{margin-top:25px}}
 @media(max-width:540px){main{padding:24px 18px 145px}.brand{font-size:10px}.heading-row{margin-top:23px}h1{font-size:33px}h1 span{font-size:19px}.intro{font-size:14px}.toolbar-hint{display:none}.cards{grid-template-columns:1fr;gap:12px}.card{min-height:140px;padding:18px 20px}.card-top{margin-bottom:9px}.card-text{font-size:24px}.card-caption{padding-top:10px}.settings{grid-template-columns:1fr;padding:18px}.player{padding-left:18px;padding-right:18px}.player-inner{gap:12px}.player-symbol{display:none}.player-copy p{font-size:14px}.stop-button{padding:10px 12px;font-size:13px}.page-footer{font-size:11px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+.page-footer a{color:inherit;text-underline-offset:3px}
