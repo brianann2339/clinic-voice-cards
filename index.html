@@ -11,8 +11,8 @@
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=5">
-  <script src="./app.js?v=5" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=6">
+  <script src="./app.js?v=6" defer></script>
 </head>
 <body>
   <main>
@@ -29,7 +29,8 @@
       <label for="volume">音量 <output id="volume-value" for="volume">100%</output><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
       <p>整體音量也可用 iPad 側邊按鍵調整。</p>
     </section>
-    <section id="cards" class="cards" aria-label="點選台詞播放語音"></section>
+    <nav id="flow-nav" class="flow-nav" aria-label="看診流程分類"></nav>
+    <div id="cards" class="card-groups"></div>
     <noscript><p class="notice">請開啟 Safari 的 JavaScript，才能點選卡片播放。</p></noscript>
     <footer class="page-footer"><span>每一句，都可以慢慢說。</span><span id="offline-status">合成男聲語音</span></footer>
   </main>

@@ -25,8 +25,17 @@ const phrases = [
   { file: '24-normal-results', text: '剛才檢查結果都正常，別太擔心。' }
 ];
 
+const groups = [
+  { id: 'opening', name: '開場與問診', files: ['14-introduction', '08-unwell', '09-pain', '10-breath'] },
+  { id: 'tests', name: '安排檢查', files: ['05-blood', '07-test', '21-ecg', '23-xray', '22-ct-consent'] },
+  { id: 'results', name: '說明結果', files: ['01-results', '24-normal-results', '13-xray-normal', '12-xray-no-fracture', '11-inflammation', '04-flu-a', '03-fracture', '02-cancer'] },
+  { id: 'treatment', name: '治療處置', files: ['06-iv', '15-im-injection', '18-suture', '20-tetanus'] },
+  { id: 'closing', name: '返家與收尾', files: ['19-keep-dry', '17-oral-meds', '16-questions'] }
+];
+
 const audio = document.querySelector('#audio');
 const cards = document.querySelector('#cards');
+const flowNav = document.querySelector('#flow-nav');
 const stopButton = document.querySelector('#stop');
 const nowPlaying = document.querySelector('#now-playing');
 const playbackLabel = document.querySelector('#playback-label');
@@ -41,7 +50,7 @@ const queue = [];
 
 function updateQueue() {
   playbackLabel.textContent = playbackState + (queue.length ? ' · 待播 ' + queue.length + ' 句' : '');
-  for (const card of cards.children) {
+  for (const card of cards.querySelectorAll('.card')) {
     const count = queue.filter(item => item.card === card).length;
     const position = queue.findIndex(item => item.card === card) + 1;
     card.classList.toggle('is-queued', count > 0);
@@ -150,17 +159,38 @@ function enqueuePhrase(phrase, card) {
   }
 }
 
-phrases.forEach((phrase, index) => {
-  const card = document.createElement('button');
-  card.type = 'button';
-  card.className = 'card';
-  card.setAttribute('aria-label', '播放：' + phrase.text);
-  card.setAttribute('aria-pressed', 'false');
-  card.innerHTML = '<span class="card-top"><span class="card-number">' + String(index + 1).padStart(2, '0') + '</span><span class="card-play" aria-hidden="true"><svg viewBox="0 0 12 14"><path fill="currentColor" d="M1 0 12 7 1 14Z"/></svg></span></span><span class="card-text"></span><span class="card-caption" aria-hidden="true">點一下播放</span>';
-  card.querySelector('.card-text').textContent = phrase.text;
-  card.addEventListener('click', () => enqueuePhrase(phrase, card));
-  cards.append(card);
+let cardNumber = 0;
+groups.forEach((group, index) => {
+  const link = document.createElement('a');
+  link.href = '#' + group.id;
+  link.textContent = group.name;
+  flowNav.append(link);
+
+  const section = document.createElement('section');
+  section.id = group.id;
+  section.className = 'phrase-group';
+  section.setAttribute('aria-labelledby', group.id + '-title');
+  section.innerHTML = '<div class="group-heading"><span class="group-step" aria-hidden="true">' + String(index + 1).padStart(2, '0') + '</span><h2 id="' + group.id + '-title"></h2><span class="group-count">' + group.files.length + ' 句</span></div><div class="cards"></div>';
+  section.querySelector('h2').textContent = group.name;
+
+  for (const file of group.files) {
+    const phrase = phrases.find(item => item.file === file);
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'card';
+    card.dataset.file = phrase.file;
+    card.setAttribute('aria-label', '播放：' + phrase.text);
+    card.setAttribute('aria-pressed', 'false');
+    card.innerHTML = '<span class="card-top"><span class="card-number">' + String(++cardNumber).padStart(2, '0') + '</span><span class="card-play" aria-hidden="true"><svg viewBox="0 0 12 14"><path fill="currentColor" d="M1 0 12 7 1 14Z"/></svg></span></span><span class="card-text"></span><span class="card-caption" aria-hidden="true">點一下播放</span>';
+    card.querySelector('.card-text').textContent = phrase.text;
+    card.addEventListener('click', () => enqueuePhrase(phrase, card));
+    section.querySelector('.cards').append(card);
+  }
+  cards.append(section);
 });
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--flow-nav-height', flowNav.offsetHeight + 'px');
+}).observe(flowNav);
 
 audio.addEventListener('loadedmetadata', applySettings);
 stopButton.addEventListener('click', stopPlayback);
@@ -192,7 +222,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') stop
 if ('serviceWorker' in navigator) {
   const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.cache === 'clinic-voice-cards-v5') {
+    if (event.data?.cache === 'clinic-voice-cards-v6') {
       document.querySelector('#offline-status').textContent = '語音已備妥 · 可離線使用';
     }
   });
