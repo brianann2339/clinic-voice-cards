@@ -166,9 +166,7 @@ function playSpeech(phrase, request) {
   activeUtterance = utterance;
   utterance.voice = voice;
   utterance.lang = voice.lang;
-  utterance.rate = Number(rateInput.value);
-  utterance.volume = Number(volumeInput.value);
-  utterance.pitch = 0.8;
+  utterance.rate = 0.95 * Number(rateInput.value);
   continueButton.hidden = false;
   utterance.onstart = () => {
     if (request !== playRequest) return;
@@ -184,14 +182,13 @@ function playSpeech(phrase, request) {
       ? '文字太長，請分成幾句再播放。待播已清空。'
       : '文字朗讀未成功，待播已清空。請重新選擇聲音後再試。');
   };
-  synth.resume();
   synth.speak(utterance);
 }
 
 function playPhrase(phrase, card) {
   const request = ++playRequest;
   audio.pause();
-  if (activeUtterance) synth.cancel();
+  if (synth && (activeUtterance || !phrase.file)) synth.cancel();
   clearActive();
   activePhrase = phrase;
   activeCard = card;
@@ -258,7 +255,7 @@ function refreshVoices() {
   document.querySelector('#reload-voices').hidden = !synth || voices.length > 0;
   voiceStatus.textContent = !synth ? '此瀏覽器不支援文字朗讀。請用 iPad 的 Safari 開啟；固定卡片仍可使用。'
     : !voices.length ? '尚未找到裝置上的中文語音。請先下載中文語音，再點「重新讀取聲音」。'
-    : '使用裝置上的中文語音，預設較低音調；聲線可能與固定卡片不同。';
+    : '使用裝置上的中文語音；朗讀音量請用裝置音量鍵調整，聲線可能與固定卡片不同。';
   updateCustomSubmit();
 }
 
@@ -358,7 +355,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') stop
 if ('serviceWorker' in navigator) {
   const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.cache === 'clinic-voice-cards-v7') {
+    if (event.data?.cache === 'clinic-voice-cards-v8') {
       document.querySelector('#offline-status').textContent = '固定卡片已備妥 · 可離線使用';
     }
   });
