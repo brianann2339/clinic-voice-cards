@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17594f">
+  <title>新男聲試聽 · 診間語音</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=11">
+  <style>
+    main{max-width:760px;padding-bottom:48px}.preview-card{margin-top:32px;padding:28px;border:1px solid var(--line);border-radius:20px;background:var(--white)}.preview-card h2{font-size:28px;line-height:1.5;margin:0 0 24px}.preview-card audio{display:block;width:100%;margin-top:18px}.preview-note{font-size:15px;line-height:1.8;color:var(--muted)}.preview-link{display:inline-flex;align-items:center;min-height:44px;color:var(--green);text-underline-offset:4px}.preview-card button{width:100%;min-height:56px}.preview-status{min-height:24px;font-size:14px;color:var(--muted);margin:14px 0 0}@media(max-width:540px){.preview-card{padding:22px}.preview-card h2{font-size:25px}}
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="brand"><img class="brand-mark" src="./icon.svg" alt=""><span>VOICE CARDS</span></div>
+      <div class="heading-row"><h1>新男聲試聽<span>先聽聽，字句是否清楚。</span></h1></div>
+      <p class="preview-note">這是預先產生的短句音檔，用來確認聲音是否聽得懂。自由輸入尚未換成這個聲音；這裡的播放速度也不代表即時合成速度。</p>
+    </header>
+    <section class="preview-card" aria-labelledby="sample-title">
+      <h2 id="sample-title">你好，請稍等。</h2>
+      <button class="speak-button" id="sample-play" type="button">▶ 播放新男聲</button>
+      <audio id="sample-audio" controls preload="none" playsinline aria-label="新男聲：你好，請稍等。" src="./audio/preview-kokoro-greeting.wav"></audio>
+      <p class="preview-status" id="sample-status" role="status" aria-live="polite">請在 iPad Safari 點一下播放。</p>
+    </section>
+    <section class="preview-card" aria-labelledby="clinic-title">
+      <h2 id="clinic-title">X光都正常，沒有骨折。</h2>
+      <button class="speak-button" type="button">▶ 播放診間短句</button>
+      <audio controls preload="none" playsinline aria-label="新男聲：X光都正常，沒有骨折。" src="./audio/preview-kokoro-xray.wav"></audio>
+      <p class="preview-status" role="status" aria-live="polite">再聽一句實際會用到的話。</p>
+    </section>
+    <p class="preview-note">試聽時請留意每個字是否清楚、音色是否適合在診間使用。這一頁不需要下載完整語音模型。</p>
+    <a class="preview-link" href="./?v=11#typing">← 回到診間語音卡片</a>
+    <footer class="page-footer"><span>試聽聲音：<a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro</a> · 雲健男聲</span><span>預錄試聽</span></footer>
+  </main>
+  <script>
+    const samples = [...document.querySelectorAll('audio')];
+    document.querySelectorAll('.preview-card').forEach(card => {
+      const sample = card.querySelector('audio');
+      const status = card.querySelector('.preview-status');
+      card.querySelector('button').addEventListener('click', () => {
+        sample.currentTime = 0;
+        sample.play().catch(() => { status.textContent = '請點下方播放器的播放鍵再試一次。'; });
+      });
+      sample.addEventListener('play', () => {
+        samples.filter(other => other !== sample).forEach(other => other.pause());
+      });
+      sample.addEventListener('playing', () => { status.textContent = '正在播放試聽音檔'; });
+      sample.addEventListener('pause', () => { status.textContent = '已暫停，可以再按播放。'; });
+      sample.addEventListener('ended', () => { status.textContent = '播放完畢，可以再聽一次。'; });
+      sample.addEventListener('error', () => { status.textContent = '音檔無法載入，請確認網路後重新整理。'; });
+    });
+  </script>
+</body>
+</html>

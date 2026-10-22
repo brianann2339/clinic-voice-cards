@@ -22,6 +22,8 @@
 
 純 HTML、CSS、JavaScript，無需建置。以 `python3 -m http.server 8765` 預覽，GitHub Pages 使用 main 分支根目錄。
 
+[新男聲試聽](voice-preview.html) 僅提供本機產生的 Kokoro `zm_yunjian` 預錄短句，供使用者評估清晰度，不代表即時合成已整合或已通過 iPad 測試。試聽頁不載入語音模型；正式自由輸入仍使用上述 v11 引擎。
+
 語音生成方式見 `tools/generate_audio.py`；固定使用 Microsoft `zh-TW-YunJheNeural` 男聲，稍慢語速與降低音高。語音檔不包含任何實際病人資料。使用時不呼叫語音生成服務。
 
 ## 授權
