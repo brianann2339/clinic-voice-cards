@@ -28,6 +28,8 @@ iPad 上系統語音若顯示「正在朗讀」卻沒有聲音（2026-10-22 與 
 
 語音生成方式見 `tools/generate_audio.py`；固定使用 Microsoft `zh-TW-YunJheNeural` 男聲，稍慢語速與降低音高。語音檔不包含任何實際病人資料。使用時不呼叫語音生成服務。
 
+[離線神經語音試點](neural-preview.html) 是獨立的實驗頁，尚未整合進自由輸入，也不在 Service Worker 的離線預載內。它在瀏覽器 Worker 內以 sherpa-onnx 2.0.0 的 WebAssembly 引擎即時合成國語 WAV，再用一般 `<audio>` 播放；文字不會離開裝置。可選兩個模型：超文 chaowen（Piper VITS int8，22.05 kHz，連引擎第一次約下載 33 MB；授權邊界未釐清，見 THIRD_PARTY.md）與 AISHELL-3（icefall VITS，8 kHz，174 位說話者，Apache-2.0，約 44 MB）。合成前會把英文字母改寫成國語讀音、再用 opencc-js 做字級繁轉簡，因為模型詞典的多字詞只有簡體（「音樂、銀行、長大、還是」直接送繁體會念錯）；數字由引擎內建規則轉成中文讀法。頁面提供三個固定測試句與自由輸入，並顯示下載大小、載入與合成耗時；加上 `?autotest=1`（可配 `&model=aishell3`、`&wasm=lowmem`）會自動載入並合成三句。`wasm=lowmem` 使用起始記憶體 128 MB 的修改版 wasm，供標準版在 iPad 上載入失敗時備用。本頁在 macOS Safari 與 Chromium 實測可合成，iPad 實機與人耳評估待確認。
+
 ## 授權
 
 含本機合成引擎的版本使用 GPL-3.0-or-later；完整條款見 [LICENSE](LICENSE)。第三方來源、固定版本與對應原始碼見 [THIRD_PARTY.md](THIRD_PARTY.md)。

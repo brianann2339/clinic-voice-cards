@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17594f">
+  <title>離線神經語音試點 · 診間語音</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=13">
+  <style>
+    main{max-width:760px;padding-bottom:48px}
+    .preview-note{font-size:15px;line-height:1.8;color:var(--muted)}
+    .pilot-card{margin-top:24px;padding:24px;border:1px solid var(--line);border-radius:20px;background:var(--white)}
+    .pilot-card h2{font-size:20px;line-height:1.5;margin:0 0 14px}
+    .choice{border:0;margin:0 0 14px;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+    .choice legend{margin-bottom:10px;font-size:14px;font-weight:600}
+    .choice label{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:12px;background:var(--white);cursor:pointer;font-size:15px}
+    .choice input{accent-color:var(--green);width:18px;height:18px;margin:0}
+    .pilot-card button{min-height:52px}
+    .pilot-card .speak-button{width:100%}
+    .sentence-buttons{display:grid;gap:10px;margin:0 0 14px}
+    .sentence-buttons button,.minor-button{min-height:52px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;background:var(--white);font:inherit;font-size:17px;color:var(--ink);cursor:pointer;text-align:left}
+    .sentence-buttons button:disabled,.minor-button:disabled,.speak-button:disabled{opacity:.5;cursor:default}
+    textarea{width:100%;box-sizing:border-box;min-height:96px;padding:12px;border:1px solid var(--line);border-radius:12px;font:inherit;font-size:18px;line-height:1.6;background:var(--white);color:var(--ink)}
+    .field-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0 0;font-size:15px}
+    .field-row input[type=number]{width:90px;min-height:40px;padding:6px 8px;border:1px solid var(--line);border-radius:10px;font:inherit}
+    progress{width:100%;height:14px;margin:12px 0 6px;accent-color:var(--green)}
+    .status{min-height:24px;font-size:15px;line-height:1.7;color:var(--muted);margin:8px 0 0;white-space:pre-wrap}
+    .facts{margin:12px 0 0;padding:0;list-style:none;font-size:14px;line-height:1.8;color:var(--muted)}
+    .facts li{display:flex;justify-content:space-between;gap:12px;border-top:1px dashed var(--line);padding:4px 0}
+    .facts li span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+    .result{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+    .result h3{font-size:22px;line-height:1.5;margin:0 0 8px}
+    .result audio{display:block;width:100%;margin-top:12px}
+    .result .speak-button{margin-top:10px}
+    .pipeline{margin:0;font-size:14px;line-height:1.8;color:var(--muted)}
+    .pipeline dt{display:inline;font-weight:600}
+    .pipeline dd{display:inline;margin:0}
+    .pipeline div{display:block}
+    .metrics{font-size:14px;color:var(--muted);line-height:1.8;margin:8px 0 0;font-variant-numeric:tabular-nums}
+    .warn{color:#8a3b12}
+    details{margin-top:16px}
+    details summary{cursor:pointer;font-size:15px;min-height:44px;display:flex;align-items:center}
+    pre{font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all;max-height:320px;overflow:auto;background:var(--paper);padding:12px;border-radius:10px;margin:0}
+    .preview-link{display:inline-flex;align-items:center;min-height:44px;color:var(--green);text-underline-offset:4px}
+    @media(max-width:540px){.pilot-card{padding:18px}.result h3{font-size:20px}}
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="brand"><img class="brand-mark" src="./icon.svg" alt=""><span>VOICE CARDS</span></div>
+      <div class="heading-row"><h1>離線神經語音試點<span>在這台裝置上即時合成國語。</span></h1></div>
+      <p class="preview-note">這一頁會下載語音引擎與模型到瀏覽器，在本機合成 WAV 後用一般播放器播出；文字不會離開這台裝置。第一次載入約需下載 <span id="expected-size">—</span>，之後每次開啟都會重新下載（尚未加入離線快取）。請先按「載入引擎」，再點測試句或自己輸入。</p>
+    </header>
+
+    <section class="pilot-card" aria-labelledby="engine-title">
+      <h2 id="engine-title">1 · 載入引擎</h2>
+      <fieldset class="choice" id="model-choice"><legend>模型</legend></fieldset>
+      <fieldset class="choice"><legend>WebAssembly 起始記憶體</legend>
+        <label><input type="radio" name="wasm" value="standard" checked>標準（官方檔，512 MB 起始）</label>
+        <label><input type="radio" name="wasm" value="lowmem">縮減（128 MB 起始；載入失敗時再試這個）</label>
+      </fieldset>
+      <button class="speak-button" id="load-button" type="button">載入引擎</button>
+      <progress id="load-progress" max="1" value="0" hidden></progress>
+      <p class="status" id="load-status" role="status" aria-live="polite">尚未載入。</p>
+      <ul class="facts" id="load-facts" hidden></ul>
+    </section>
+
+    <section class="pilot-card" aria-labelledby="speak-title">
+      <h2 id="speak-title">2 · 合成並播放</h2>
+      <div class="sentence-buttons" id="sentence-buttons"></div>
+      <label for="free-text" style="font-size:14px;font-weight:600">自己輸入</label>
+      <textarea id="free-text" placeholder="輸入要唸給病人聽的話" autocomplete="off" autocapitalize="off" spellcheck="false" disabled></textarea>
+      <div class="field-row">
+        <button class="minor-button" id="free-submit" type="button" disabled>合成這段文字</button>
+        <label id="speaker-row" hidden>說話者編號 <input type="number" id="speaker-id" min="0" value="0" inputmode="numeric"></label>
+      </div>
+      <p class="status" id="speak-status" role="status" aria-live="polite">引擎就緒後即可合成。</p>
+      <div id="results"></div>
+    </section>
+
+    <details>
+      <summary>引擎訊息（除錯用）</summary>
+      <pre id="engine-log">（尚無訊息）</pre>
+    </details>
+    <details id="autotest-details" hidden>
+      <summary>自動測試結果（JSON）</summary>
+      <pre id="autotest-json"></pre>
+    </details>
+
+    <p class="preview-note" style="margin-top:24px">說明：合成前會先把英文字母改寫成國語讀音（例如 X → 艾克斯），再用 OpenCC 把繁體字轉成簡體字送進引擎（模型詞典只有簡體多字詞；「音樂、銀行、長大、還是」在繁體下會念錯），畫面上會列出每一步的文字。數字由引擎內建規則轉成中文讀法。</p>
+    <a class="preview-link" href="./?v=13#typing">← 回到診間語音卡片</a>
+    <footer class="page-footer"><span>引擎：<a href="https://github.com/k2-fsa/sherpa-onnx">sherpa-onnx 2.0.0</a>（WebAssembly）· 繁轉簡：<a href="https://github.com/nk2028/opencc-js">opencc-js 1.4.2</a></span><span>試點頁，未整合進自由輸入</span></footer>
+  </main>
+
+  <script src="./vendor/opencc-js/t2cn.js"></script>
+  <script>
+    const MODELS = {
+      chaowen: {
+        label: '超文 chaowen（Piper VITS，int8，22.05 kHz，單一女聲）',
+        dir: './models/vits-piper-zh_CN-chaowen-medium-int8/',
+        model: 'zh_CN-chaowen-medium.onnx', tokens: 'tokens.txt', lexicon: 'lexicon.txt',
+        fsts: ['phone.fst', 'date.fst', 'number.fst'],
+        expectedBytes: 18652796 + 485 + 2064505 + 88630 + 59154 + 64482,
+        note: '資料集 CC0，但由非商用資料訓練的小雅模型微調而來，授權邊界未釐清。'
+      },
+      aishell3: {
+        label: 'AISHELL-3（icefall VITS，fp32，8 kHz，174 位說話者）',
+        dir: './models/vits-icefall-zh-aishell3/',
+        model: 'model.onnx', tokens: 'tokens.txt', lexicon: 'lexicon.txt',
+        fsts: ['phone.fst', 'date.fst', 'number.fst', 'new_heteronym.fst'],
+        expectedBytes: 30482262 + 1671 + 2042943 + 88630 + 59154 + 64482 + 21974,
+        note: 'Apache-2.0，音質為 8 kHz 電話頻寬。'
+      }
+    };
+    const WASM_BYTES = 13740219;
+    const SENTENCES = ['你好，請稍等。', 'X光都正常，沒有骨折。', '音樂、銀行、長大、睡覺、還是'];
+    const LETTERS = { A: '诶', B: '比', C: '西', D: '迪', E: '衣', F: '艾弗', G: '吉', H: '艾區', I: '愛', J: '杰', K: '開', L: '艾歐', M: '艾姆', N: '恩', O: '歐', P: '批', Q: '克優', R: '阿', S: '艾斯', T: '踢', U: '優', V: '微', W: '達不溜', X: '艾克斯', Y: '歪', Z: '賊' };
+
+    const params = new URLSearchParams(location.search);
+    const autotest = params.get('autotest') === '1';
+    const $ = id => document.getElementById(id);
+    const modelChoice = $('model-choice'), loadButton = $('load-button'), loadProgress = $('load-progress'), loadStatus = $('load-status'), loadFacts = $('load-facts');
+    const sentenceButtons = $('sentence-buttons'), freeText = $('free-text'), freeSubmit = $('free-submit'), speakerRow = $('speaker-row'), speakerId = $('speaker-id'), speakStatus = $('speak-status'), results = $('results'), engineLog = $('engine-log');
+
+    const toSimplified = OpenCC.Converter({ from: 'tw', to: 'cn' });
+    const mb = bytes => (bytes / 1048576).toFixed(1) + ' MB';
+    const ms = value => Math.round(value).toLocaleString('zh-Hant-TW') + ' ms';
+    const logLines = [];
+    const state = { worker: null, ready: false, modelId: null, wasm: 'standard', info: null, pending: new Map(), nextId: 1, busy: false, errors: [] };
+
+    Object.entries(MODELS).forEach(([id, model], index) => {
+      const label = document.createElement('label');
+      const input = Object.assign(document.createElement('input'), { type: 'radio', name: 'model', value: id, checked: index === 0 });
+      label.append(input, document.createTextNode(model.label));
+      label.title = model.note;
+      modelChoice.appendChild(label);
+    });
+    if (params.get('model') in MODELS) document.querySelector(`[name="model"][value="${params.get('model')}"]`).checked = true;
+    if (params.get('wasm') === 'lowmem') document.querySelector('[name="wasm"][value="lowmem"]').checked = true;
+    const updateExpected = () => { $('expected-size').textContent = mb(WASM_BYTES + MODELS[selectedModel()].expectedBytes); };
+    const selectedModel = () => document.querySelector('[name="model"]:checked').value;
+    const selectedWasm = () => document.querySelector('[name="wasm"]:checked').value;
+    modelChoice.addEventListener('change', updateExpected);
+    updateExpected();
+
+    function simdSupported() {
+      try { return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11])); } catch (error) { return false; }
+    }
+
+    function appendLog(line) {
+      logLines.push(line);
+      if (logLines.length > 400) logLines.splice(0, logLines.length - 400);
+      engineLog.textContent = logLines.join('\n');
+    }
+
+    function prepareText(raw) {
+      const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const original = lines.map((line, index) => (index === lines.length - 1 || /[。？！，、；：.?!,;:]$/.test(line)) ? line : line + '。').join('');
+      const lettered = original.replace(/[A-Za-z]/g, letter => LETTERS[letter.toUpperCase()]);
+      const simplified = toSimplified(lettered);
+      return { original, lettered, simplified };
+    }
+
+    function setBusy(busy) {
+      state.busy = busy;
+      const disabled = busy || !state.ready;
+      sentenceButtons.querySelectorAll('button').forEach(button => { button.disabled = disabled; });
+      freeSubmit.disabled = disabled;
+      freeText.disabled = !state.ready;
+    }
+
+    function startLoad() {
+      if (state.worker) return;
+      state.modelId = selectedModel();
+      state.wasm = selectedWasm();
+      const model = MODELS[state.modelId];
+      modelChoice.querySelectorAll('input').forEach(input => { input.disabled = true; });
+      document.querySelectorAll('[name="wasm"]').forEach(input => { input.disabled = true; });
+      loadButton.disabled = true;
+      loadProgress.hidden = false;
+      loadStatus.textContent = `開始載入… SIMD 支援：${simdSupported() ? '是' : '否'}`;
+      const progress = { wasm: { loaded: 0, total: WASM_BYTES }, model: {} };
+      const worker = new Worker('./neural-tts-worker.js');
+      state.worker = worker;
+      worker.onerror = event => {
+        const message = event.message || '（無訊息）';
+        state.errors.push('Worker 錯誤：' + message);
+        loadStatus.textContent = 'Worker 錯誤：' + message;
+        loadStatus.classList.add('warn');
+        finishAutotestIfFailed();
+      };
+      worker.onmessage = event => {
+        const message = event.data;
+        if (message.type === 'log') { appendLog(message.line); return; }
+        if (message.type === 'progress') {
+          if (message.stage === 'wasm') progress.wasm = { loaded: message.loaded, total: message.total || WASM_BYTES };
+          else progress.model[message.file] = { loaded: message.loaded, total: message.total };
+          const modelLoaded = Object.values(progress.model).reduce((sum, item) => sum + item.loaded, 0);
+          const total = progress.wasm.total + model.expectedBytes;
+          const loaded = progress.wasm.loaded + modelLoaded;
+          loadProgress.value = Math.min(1, loaded / total);
+          loadStatus.textContent = `${message.stage === 'wasm' ? '下載引擎' : '下載模型'} ${mb(loaded)} / ${mb(total)}（${message.file}）`;
+          return;
+        }
+        if (message.type === 'ready') {
+          state.ready = true;
+          state.info = message;
+          loadProgress.value = 1;
+          loadStatus.textContent = '引擎就緒。';
+          const modelBytes = Object.values(message.bytes.model).reduce((sum, value) => sum + value, 0);
+          const facts = [
+            ['模型', model.label], ['起始記憶體', state.wasm === 'lowmem' ? '縮減 128 MB' : '標準 512 MB'],
+            ['下載：引擎 wasm', mb(message.bytes.wasm)], ['下載：模型檔', mb(modelBytes)], ['下載合計', mb(message.bytes.wasm + modelBytes)],
+            ['引擎 wasm 下載', ms(message.timings.wasmDownloadMs)], ['wasm 編譯＋啟動', ms(message.timings.wasmInstantiateMs)],
+            ['模型檔全部到齊（自開始起）', ms(message.timings.modelFilesReadyAtMs)], ['引擎初始化', ms(message.timings.engineInitMs)],
+            ['載入總計', ms(message.timings.totalMs)], ['取樣率', message.sampleRate + ' Hz'], ['說話者數', String(message.numSpeakers)],
+            ['wasm 記憶體目前大小', mb(message.heapBytes)]
+          ];
+          loadFacts.innerHTML = '';
+          facts.forEach(([key, value]) => { const li = document.createElement('li'); li.innerHTML = `<span>${key}</span><span>${value}</span>`; loadFacts.appendChild(li); });
+          loadFacts.hidden = false;
+          if (message.numSpeakers > 1) { speakerRow.hidden = false; speakerId.max = String(message.numSpeakers - 1); }
+          setBusy(false);
+          speakStatus.textContent = '請點測試句，或輸入文字後合成。';
+          if (autotest) runAutotest();
+          return;
+        }
+        if (message.type === 'result') {
+          const job = state.pending.get(message.id);
+          state.pending.delete(message.id);
+          if (job) showResult(job, message);
+          setBusy(false);
+          return;
+        }
+        if (message.type === 'error') {
+          state.errors.push(`${message.stage}：${message.message}`);
+          if (message.log) message.log.forEach(appendLog);
+          if (message.stage === 'load') {
+            loadStatus.textContent = '載入失敗：' + message.message;
+            loadStatus.classList.add('warn');
+            finishAutotestIfFailed();
+          } else {
+            const job = state.pending.get(message.id);
+            state.pending.delete(message.id);
+            speakStatus.textContent = '合成失敗：' + message.message;
+            speakStatus.classList.add('warn');
+            if (job && job.resolve) job.resolve(null);
+            setBusy(false);
+          }
+        }
+      };
+      worker.postMessage({ type: 'load', model: { dir: model.dir, model: model.model, tokens: model.tokens, lexicon: model.lexicon, fsts: model.fsts }, wasm: state.wasm });
+    }
+
+    function synthesize(raw) {
+      return new Promise(resolve => {
+        if (!state.ready || state.busy) { resolve(null); return; }
+        const text = prepareText(raw);
+        if (!/[\p{Script=Han}0-9]/u.test(text.simplified)) { speakStatus.textContent = '請先輸入要唸的文字（只有標點或空白時不合成）。'; resolve(null); return; }
+        const id = state.nextId++;
+        const sid = Number(speakerId.value) || 0;
+        state.pending.set(id, { text, sid, resolve, startedAt: performance.now() });
+        setBusy(true);
+        speakStatus.textContent = '合成中…';
+        speakStatus.classList.remove('warn');
+        state.worker.postMessage({ type: 'generate', id, text: text.simplified, sid, speed: 1.0 });
+      });
+    }
+
+    function showResult(job, message) {
+      const durationS = message.numSamples / message.sampleRate;
+      const oov = (message.log || []).map(line => (/Ignore OOV '(.*)'/.exec(line) || [])[1]).filter(Boolean);
+      const blob = new Blob([message.wav], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      const card = document.createElement('article');
+      card.className = 'result';
+      const steps = [['原文', job.text.original]];
+      if (job.text.lettered !== job.text.original) steps.push(['字母改寫', job.text.lettered]);
+      if (job.text.simplified !== job.text.lettered) steps.push(['送入引擎（繁轉簡）', job.text.simplified]); else steps.push(['送入引擎', job.text.simplified]);
+      card.innerHTML = `<h3></h3><dl class="pipeline"></dl><p class="metrics"></p><button class="speak-button" type="button">▶ 播放</button><audio controls playsinline preload="auto"></audio><p class="status"></p>`;
+      card.querySelector('h3').textContent = job.text.original;
+      const pipeline = card.querySelector('.pipeline');
+      steps.forEach(([key, value]) => { const row = document.createElement('div'); row.innerHTML = '<dt></dt>：<dd></dd>'; row.querySelector('dt').textContent = key; row.querySelector('dd').textContent = value; pipeline.appendChild(row); });
+      const rtf = message.synthMs / 1000 / durationS;
+      card.querySelector('.metrics').textContent = `合成 ${ms(message.synthMs)} · 音長 ${durationS.toFixed(2)} 秒 · 即時率 ${rtf.toFixed(2)} · ${message.sampleRate} Hz · 峰值 ${message.peak.toFixed(2)} · 均方根 ${message.rms.toFixed(3)} · wasm 記憶體 ${mb(message.heapBytes)}` + (oov.length ? ` · 引擎忽略：${oov.join('、')}` : '');
+      if (oov.length) card.querySelector('.metrics').classList.add('warn');
+      const audio = card.querySelector('audio');
+      audio.src = url;
+      audio.setAttribute('aria-label', '試聽：' + job.text.original);
+      const status = card.querySelector('.status');
+      card.querySelector('button').addEventListener('click', () => {
+        document.querySelectorAll('audio').forEach(other => { if (other !== audio) other.pause(); });
+        audio.currentTime = 0;
+        audio.play().catch(() => { status.textContent = '請點播放器的播放鍵再試一次。'; });
+      });
+      audio.addEventListener('playing', () => { status.textContent = '正在播放'; });
+      audio.addEventListener('ended', () => { status.textContent = '播放完畢，可以再聽一次。'; });
+      audio.addEventListener('error', () => { status.textContent = '音檔無法播放。'; });
+      results.prepend(card);
+      speakStatus.textContent = `完成：合成 ${ms(message.synthMs)}，音長 ${durationS.toFixed(2)} 秒。請按播放。`;
+      job.result = { text: job.text, sid: job.sid, synthMs: message.synthMs, durationS, rtf, sampleRate: message.sampleRate, peak: message.peak, rms: message.rms, heapBytes: message.heapBytes, oov };
+      if (job.resolve) job.resolve(job.result);
+    }
+
+    SENTENCES.forEach(sentence => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = sentence;
+      button.disabled = true;
+      button.addEventListener('click', () => synthesize(sentence));
+      sentenceButtons.appendChild(button);
+    });
+    loadButton.addEventListener('click', startLoad);
+    freeSubmit.addEventListener('click', () => synthesize(freeText.value));
+
+    let autotestDone = false;
+    function finishAutotest(extra) {
+      if (autotestDone) return;
+      autotestDone = true;
+      $('autotest-details').hidden = false;
+      $('autotest-details').open = true;
+      $('autotest-json').textContent = JSON.stringify(Object.assign({
+        userAgent: navigator.userAgent, hardwareConcurrency: navigator.hardwareConcurrency, simd: simdSupported(),
+        model: state.modelId, wasm: state.wasm, ready: state.ready, info: state.info && { bytes: state.info.bytes, timings: state.info.timings, heapBytes: state.info.heapBytes, sampleRate: state.info.sampleRate, numSpeakers: state.info.numSpeakers },
+        errors: state.errors, logTail: logLines.slice(-30)
+      }, extra), null, 1);
+    }
+    function finishAutotestIfFailed() { if (autotest) finishAutotest({ results: [] }); }
+    async function runAutotest() {
+      const list = [];
+      for (const sentence of SENTENCES) list.push(await synthesize(sentence));
+      finishAutotest({ results: list });
+    }
+    if (autotest) startLoad();
+  </script>
+</body>
+</html>
