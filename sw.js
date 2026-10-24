@@ -1,5 +1,5 @@
-const CACHE = 'clinic-voice-cards-v12';
-const ASSETS = ['./', './index.html', './styles.css?v=12', './app.js?v=12', './icon.svg', './apple-touch-icon.png', './icon-512.png', './manifest.webmanifest',
+const CACHE = 'clinic-voice-cards-v13';
+const ASSETS = ['./', './index.html', './styles.css?v=13', './app.js?v=13', './icon.svg', './apple-touch-icon.png', './icon-512.png', './manifest.webmanifest',
   './local-tts-worker.js', './vendor/spellophone/dist/browser.js', './vendor/spellophone/dist/core-w4y-vCu9.js', './vendor/spellophone/wasm/espeak-ng.js', './vendor/spellophone/wasm/espeak-ng.wasm', './vendor/spellophone/espeak-ng-data/manifest.json', './vendor/spellophone/espeak-ng-data/core.bin', './vendor/spellophone/espeak-ng-data/en_dict', './vendor/spellophone/espeak-ng-data/cmn_dict',
   '01-results', '02-cancer', '03-fracture', '04-flu-a', '05-blood', '06-iv', '07-test', '08-unwell', '09-pain', '10-breath', '11-inflammation',
   '12-xray-no-fracture', '13-xray-normal', '14-introduction', '15-im-injection', '16-questions', '17-oral-meds', '18-suture', '19-keep-dry', '20-tetanus',

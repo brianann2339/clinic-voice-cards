@@ -351,7 +351,7 @@ function updateCustomSubmit() {
 function updateVoiceStatus() {
   if (voiceSelect.value === LOCAL_VOICE) {
     voiceStatus.textContent = voices.length
-      ? '備用機械語音：聲調與斷句常不準；裝置語音能出聲時，建議改選上方的裝置語音。音量依播放設定；文字不會外傳。'
+      ? '備用機械語音（預設）：聲調與斷句常不準，但可離線、音量依播放設定；文字不會外傳。上方的裝置語音在 iPad Safari 上可能無聲，改選前請先按「試聽」。'
       : !synth
         ? '這個瀏覽器未提供語音朗讀功能（iPad 開啟「鎖定模式」時會如此，備用機械語音也可能無法載入）；請先用固定卡片。文字不會外傳。'
         : voicesSettled
@@ -378,11 +378,9 @@ function refreshVoices() {
   localOption.value = LOCAL_VOICE;
   localOption.textContent = !synth ? '備用機械語音（瀏覽器未提供語音朗讀）' : voices.length || !voicesSettled ? '備用機械語音（相容模式）' : '備用機械語音（此裝置沒有中文系統語音）';
   voiceSelect.append(localOption);
-  voiceSelect.value = preferredVoice === LOCAL_VOICE ? LOCAL_VOICE
-    : voices.find(voice => voice.voiceURI === preferredVoice)?.voiceURI
-      || voices.find(voice => previous && voice.name === previous.name && voice.lang === previous.lang)?.voiceURI
-      || voices[0]?.voiceURI
-      || LOCAL_VOICE;
+  voiceSelect.value = voices.find(voice => voice.voiceURI === preferredVoice)?.voiceURI
+    || voices.find(voice => previous && voice.name === previous.name && voice.lang === previous.lang)?.voiceURI
+    || LOCAL_VOICE;
   voiceSelect.disabled = false;
   document.querySelector('#reload-voices').hidden = !synth || voices.length > 0 || !voicesSettled;
   updateVoiceStatus();
@@ -507,7 +505,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') stop
 if ('serviceWorker' in navigator) {
   const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.cache === 'clinic-voice-cards-v12') {
+    if (event.data?.cache === 'clinic-voice-cards-v13') {
       document.querySelector('#offline-status').textContent = '卡片與備用語音已備妥 · 可離線使用';
     }
   });
