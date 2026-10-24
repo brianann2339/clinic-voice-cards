@@ -11,8 +11,8 @@
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=11">
-  <script src="./app.js?v=11" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=12">
+  <script src="./app.js?v=12" defer></script>
 </head>
 <body>
   <main>
@@ -26,7 +26,7 @@
     </section>
     <section id="settings" class="settings" aria-label="語速與音量" hidden>
       <label for="rate">語速 <output id="rate-value" for="rate">1.00×</output><input id="rate" type="range" min="0.8" max="1.2" step="0.05" value="1"></label>
-      <label for="volume">卡片與相容語音音量 <output id="volume-value" for="volume">100%</output><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+      <label for="volume">卡片與備用語音音量 <output id="volume-value" for="volume">100%</output><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
       <p>整體音量也可用 iPad 側邊按鍵調整。</p>
     </section>
     <nav id="flow-nav" class="flow-nav" aria-label="看診流程分類"><a href="#typing" class="typing-link">自由輸入</a></nav>
@@ -35,7 +35,7 @@
       <form id="custom-form" autocomplete="off">
         <label class="text-label" for="custom-text">想說的話</label>
         <textarea id="custom-text" rows="3" placeholder="例如：請先在外面稍等，報告出來後會再通知您。" autocomplete="off" aria-describedby="custom-help"></textarea>
-        <div class="custom-options"><label for="custom-voice">朗讀聲音</label><select id="custom-voice" aria-describedby="voice-status"></select><button id="reload-voices" class="quiet-button" type="button" hidden>重新讀取聲音</button></div>
+        <div class="custom-options"><label for="custom-voice">朗讀聲音</label><select id="custom-voice" aria-describedby="voice-status"></select><button id="voice-test" class="quiet-button" type="button">試聽</button><button id="reload-voices" class="quiet-button" type="button" hidden>重新讀取聲音</button></div>
         <p id="voice-status" class="custom-note" role="status">正在讀取裝置語音…</p>
         <div class="custom-actions"><button id="custom-submit" class="speak-button" type="submit" disabled>加入播放</button><button id="custom-clear" class="quiet-button" type="button">清除文字</button><span id="custom-status" role="status" aria-live="polite">可與卡片一起依序播放。</span></div>
         <p id="custom-help" class="custom-note">送出後修改或清除文字，不影響已排入的內容。文字不會儲存到網站。</p>

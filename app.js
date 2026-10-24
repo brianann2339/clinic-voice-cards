@@ -170,11 +170,12 @@ function showContinue(request) {
 }
 
 function playSpeech(phrase, request) {
-  const availableVoices = synth ? synth.getVoices().filter(item => item.localService) : [];
+  const availableVoices = synth ? synth.getVoices().filter(isMandarinVoice).sort(compareVoices) : [];
   const voice = availableVoices.find(item => item.voiceURI === phrase.voiceURI)
-    || availableVoices.find(item => item.name === phrase.voiceName && item.lang === phrase.voiceLang);
+    || availableVoices.find(item => item.name === phrase.voiceName && item.lang === phrase.voiceLang)
+    || availableVoices[0];
   if (!voice) {
-    showError(request, '找不到所選的裝置語音。待播已清空，請重新選擇聲音後再試。');
+    showError(request, '找不到可用的裝置中文語音。待播已清空，請改選「備用機械語音」後再試。');
     return;
   }
   const utterance = new SpeechSynthesisUtterance(phrase.text);
@@ -183,15 +184,32 @@ function playSpeech(phrase, request) {
   utterance.lang = voice.lang;
   utterance.rate = 0.95 * Number(rateInput.value);
   continueButton.hidden = false;
+  let started = false;
+  let endGuard;
+  const watchdog = setTimeout(() => { if (!started && request === playRequest) showContinue(request); }, 2000);
   utterance.onstart = () => {
+    started = true;
+    clearTimeout(watchdog);
+    endGuard = setTimeout(() => {
+      if (request !== playRequest) return;
+      utterance.onend = utterance.onerror = null;
+      synth.cancel();
+      finishPlayback(request);
+    }, 10000 + phrase.text.length * 600 / utterance.rate);
     if (request !== playRequest) return;
     continueButton.hidden = true;
     playbackState = '正在朗讀';
     updateQueue();
     document.body.classList.add('is-playing');
   };
-  utterance.onend = () => finishPlayback(request);
+  utterance.onend = () => {
+    clearTimeout(watchdog);
+    clearTimeout(endGuard);
+    finishPlayback(request);
+  };
   utterance.onerror = event => {
+    clearTimeout(watchdog);
+    clearTimeout(endGuard);
     if (event.error === 'not-allowed') showContinue(request);
     else showError(request, event.error === 'text-too-long'
       ? '文字太長，請分成幾句再播放。待播已清空。'
@@ -210,7 +228,7 @@ function playLocal(phrase, request) {
         const { request, wav, error } = event.data;
         if (worker !== localWorker || request !== playRequest || request !== localRequest) return;
         if (error) {
-          showError(request, '本機合成未成功，待播已清空。請確認語音資源已下載後再試。');
+          showError(request, '備用機械語音未能產生，待播已清空。請連網重新開啟頁面後再試。');
           return;
         }
         localRequest = null;
@@ -223,19 +241,19 @@ function playLocal(phrase, request) {
         worker.terminate();
         localWorker = null;
         localRequest = null;
-        if (request !== null) showError(request, '本機合成未成功，待播已清空。請確認語音資源已下載後再試。');
+        if (request !== null) showError(request, '備用機械語音未能產生，待播已清空。請連網重新開啟頁面後再試。');
       };
     }
     localWorker.postMessage({ request, text: phrase.text });
   } catch {
-    showError(request, '本機合成未成功，待播已清空。請確認語音資源已下載後再試。');
+    showError(request, '備用機械語音未能產生，待播已清空。請連網重新開啟頁面後再試。');
   }
 }
 
 function playPhrase(phrase, card) {
   const request = ++playRequest;
   audio.pause();
-  if (synth && (activeUtterance || (!phrase.file && phrase.engine !== 'local'))) synth.cancel();
+  if (synth && (activeUtterance || synth.speaking || synth.pending)) synth.cancel();
   clearActive();
   activePhrase = phrase;
   activeCard = card;
@@ -289,47 +307,98 @@ function enqueuePhrase(phrase, card = null) {
   }
 }
 
+const LOCAL_VOICE = 'local-cmn';
+let voicesSettled = !synth;
+
+function voiceLangScore(voice) {
+  const lang = String(voice.lang).replace(/_/g, '-').toLowerCase();
+  if (/^yue|-hk(?:-|$)|-mo(?:-|$)/.test(lang)) return 0;
+  if (/-tw(?:-|$)/.test(lang)) return 3;
+  if (/hant/.test(lang)) return 2;
+  return 1;
+}
+
+function isMandarinVoice(voice) {
+  return voice.localService && /^(?:zh|cmn)(?:[-_]|$)/i.test(voice.lang) && voiceLangScore(voice) > 0;
+}
+
+function voiceQualityScore(voice) {
+  const id = (voice.voiceURI + ' ' + voice.name).toLowerCase();
+  if (/premium|高音質/.test(id)) return 3;
+  if (/enhanced|增強音質/.test(id)) return 2;
+  return 1;
+}
+
+function compareVoices(a, b) {
+  return voiceLangScore(b) - voiceLangScore(a)
+    || voiceQualityScore(b) - voiceQualityScore(a)
+    || Number(b.default) - Number(a.default)
+    || a.name.localeCompare(b.name, 'zh-Hant');
+}
+
+function describeVoice(voice) {
+  const score = voiceLangScore(voice);
+  const region = score === 3 ? '台灣華語' : score === 2 ? '繁體中文' : '普通話';
+  const quality = voiceQualityScore(voice);
+  const suffix = quality === 1 || /增強音質|高音質|enhanced|premium/i.test(voice.name) ? '' : quality === 3 ? ' · 高音質' : ' · 增強音質';
+  return voice.name + '（' + region + suffix + '，' + voice.lang + '）';
+}
+
 function updateCustomSubmit() {
-  customSubmit.disabled = !customText.value.trim() || (voiceSelect.value !== 'local-cmn' && !voices.some(voice => voice.voiceURI === voiceSelect.value));
+  customSubmit.disabled = !customText.value.trim() || (voiceSelect.value !== LOCAL_VOICE && !voices.some(voice => voice.voiceURI === voiceSelect.value));
 }
 
 function updateVoiceStatus() {
-  voiceStatus.textContent = voiceSelect.value === 'local-cmn'
-    ? '使用本機合成（相容模式）；音量依播放設定，聲音較機械，文字不會外傳。'
-    : '使用裝置上的中文語音；朗讀音量請用裝置音量鍵調整，聲線可能與固定卡片不同。';
+  if (voiceSelect.value === LOCAL_VOICE) {
+    voiceStatus.textContent = voices.length
+      ? '備用機械語音：聲調與斷句常不準；裝置語音能出聲時，建議改選上方的裝置語音。音量依播放設定；文字不會外傳。'
+      : !synth
+        ? '這個瀏覽器未提供語音朗讀功能（iPad 開啟「鎖定模式」時會如此，備用機械語音也可能無法載入）；請先用固定卡片。文字不會外傳。'
+        : voicesSettled
+          ? '這台裝置沒有可用的中文系統語音，暫以備用機械語音朗讀（聲音生硬、聲調可能不準）。文字不會外傳。'
+          : '正在讀取裝置語音…目前先用備用機械語音；文字不會外傳。';
+    return;
+  }
+  const voice = voices.find(voice => voice.voiceURI === voiceSelect.value);
+  voiceStatus.textContent = '使用裝置內建語音「' + (voice ? voice.name : '') + '」朗讀，文字不會外傳；聲線與固定卡片的男聲不同。看診前請先按「試聽」確認聽得到；音量請用裝置音量鍵調整。若完全沒聲音，請先確認裝置未開啟靜音；仍無聲時改選選單最後的「備用機械語音」。';
 }
 
 function refreshVoices() {
-  const selected = voiceSelect.value || preferredVoice;
-  const previous = voices.find(voice => voice.voiceURI === selected);
-  voices = synth ? synth.getVoices().filter(voice => voice.localService && /^zh(?:[-_]|$)/i.test(voice.lang)) : [];
-  voices.sort((a, b) => Number(/^zh[-_]TW$/i.test(b.lang)) - Number(/^zh[-_]TW$/i.test(a.lang)) || Number(b.default) - Number(a.default));
+  const previous = voices.find(voice => voice.voiceURI === voiceSelect.value);
+  voices = synth ? synth.getVoices().filter(isMandarinVoice).sort(compareVoices) : [];
+  if (voices.length) voicesSettled = true;
   voiceSelect.replaceChildren();
-  const localOption = document.createElement('option');
-  localOption.value = 'local-cmn';
-  localOption.textContent = '本機合成（相容模式）';
-  voiceSelect.append(localOption);
   for (const voice of voices) {
     const option = document.createElement('option');
     option.value = voice.voiceURI;
-    option.textContent = voice.name + '（' + voice.lang + '）';
+    option.textContent = describeVoice(voice);
     voiceSelect.append(option);
   }
-  const matching = voices.find(voice => voice.voiceURI === selected)
-    || voices.find(voice => voice.name === previous?.name && voice.lang === previous?.lang);
-  if (matching) voiceSelect.value = matching.voiceURI;
+  const localOption = document.createElement('option');
+  localOption.value = LOCAL_VOICE;
+  localOption.textContent = !synth ? '備用機械語音（瀏覽器未提供語音朗讀）' : voices.length || !voicesSettled ? '備用機械語音（相容模式）' : '備用機械語音（此裝置沒有中文系統語音）';
+  voiceSelect.append(localOption);
+  voiceSelect.value = preferredVoice === LOCAL_VOICE ? LOCAL_VOICE
+    : voices.find(voice => voice.voiceURI === preferredVoice)?.voiceURI
+      || voices.find(voice => previous && voice.name === previous.name && voice.lang === previous.lang)?.voiceURI
+      || voices[0]?.voiceURI
+      || LOCAL_VOICE;
   voiceSelect.disabled = false;
-  document.querySelector('#reload-voices').hidden = !synth || voices.length > 0;
+  document.querySelector('#reload-voices').hidden = !synth || voices.length > 0 || !voicesSettled;
   updateVoiceStatus();
   updateCustomSubmit();
 }
 
-try { preferredVoice = localStorage.getItem('voice-card-voice-v11') || ''; } catch {}
-if (synth) synth.addEventListener('voiceschanged', refreshVoices);
+try { preferredVoice = localStorage.getItem('voice-card-voice-v12') || ''; } catch {}
+if (synth) {
+  synth.addEventListener('voiceschanged', refreshVoices);
+  for (const delay of [300, 1000]) setTimeout(() => { if (!voices.length) refreshVoices(); }, delay);
+  setTimeout(() => { voicesSettled = true; if (!voices.length) refreshVoices(); }, 3000);
+}
 refreshVoices();
 voiceSelect.addEventListener('change', () => {
   preferredVoice = voiceSelect.value;
-  try { localStorage.setItem('voice-card-voice-v11', preferredVoice); } catch {}
+  try { localStorage.setItem('voice-card-voice-v12', preferredVoice); } catch {}
   updateVoiceStatus();
   updateCustomSubmit();
 });
@@ -340,20 +409,24 @@ document.querySelector('#custom-clear').addEventListener('click', () => {
   updateCustomSubmit();
   customText.focus();
 });
+function enqueueCustom(text) {
+  const voiceURI = voiceSelect.value;
+  if (voiceURI === LOCAL_VOICE) {
+    enqueuePhrase({ text, engine: 'local' });
+    return;
+  }
+  const voice = voices.find(voice => voice.voiceURI === voiceURI);
+  if (voice) enqueuePhrase({ text, voiceURI, voiceName: voice.name, voiceLang: voice.lang });
+}
+
 document.querySelector('#custom-form').addEventListener('submit', event => {
   event.preventDefault();
   const text = customText.value.trim();
-  const voiceURI = voiceSelect.value;
   if (!text) return;
-  if (voiceURI === 'local-cmn') {
-    enqueuePhrase({ text, engine: 'local' });
-  } else {
-    const voice = voices.find(voice => voice.voiceURI === voiceURI);
-    if (!voice) return;
-    enqueuePhrase({ text, voiceURI, voiceName: voice.name, voiceLang: voice.lang });
-  }
+  enqueueCustom(text);
   customText.blur();
 });
+document.querySelector('#voice-test').addEventListener('click', () => enqueueCustom('你好，請稍等。'));
 
 const typing = document.querySelector('#typing');
 typing.open = false;
@@ -434,8 +507,8 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') stop
 if ('serviceWorker' in navigator) {
   const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.cache === 'clinic-voice-cards-v11') {
-      document.querySelector('#offline-status').textContent = '卡片與相容語音已備妥 · 可離線使用';
+    if (event.data?.cache === 'clinic-voice-cards-v12') {
+      document.querySelector('#offline-status').textContent = '卡片與備用語音已備妥 · 可離線使用';
     }
   });
   navigator.serviceWorker.addEventListener('controllerchange', checkOfflineReady);
