@@ -1,6 +1,6 @@
 # 原始碼與授權
 
-含本機合成模式的網頁程式碼以 GPL-3.0-or-later 發布，條款見 [LICENSE](LICENSE)。網頁 HTML、CSS、JavaScript 及整合用的 [local-tts-worker.js](local-tts-worker.js) 均可在[本專案原始碼](https://github.com/brianann2339/clinic-voice-cards)取得，不需建置即可部署。固定 MP3 音檔不屬於下列第三方語音引擎。
+含本機合成模式的網頁程式碼以 GPL-3.0-or-later 發布，條款見 [LICENSE](LICENSE)。網頁 HTML、CSS、JavaScript 及整合用的 [local-tts-worker.js](local-tts-worker.js)、[neural-tts-worker.js](neural-tts-worker.js) 均可在[本專案原始碼](https://github.com/brianann2339/clinic-voice-cards)取得，不需建置即可部署。固定 MP3 音檔不屬於下列第三方語音引擎。
 
 ## Spellophone 0.2.1
 
@@ -30,7 +30,7 @@ Spellophone 的 source archive 另含 `vendor/patches/0001-deterministic-diction
 
 語音引擎與字典由本網站提供；輸入文字只在網頁與本機 Worker 間傳遞，不會送至 npm、上游專案或其他語音服務。原始碼附件供下載查閱，不加入離線預載。
 
-以下元件僅供 [neural-preview.html](neural-preview.html) 離線神經語音試點頁使用，尚未整合進正式的自由輸入，也未加入 Service Worker 離線預載。
+以下元件用於自由輸入預設的「超文」語音（[neural-tts-worker.js](neural-tts-worker.js)）與 [neural-preview.html](neural-preview.html) 比較頁。sherpa-onnx 引擎、opencc-js 與超文模型檔在第一次載入時由 Service Worker 存入獨立快取；AISHELL-3 模型不快取。
 
 ## sherpa-onnx 2.0.0（WebAssembly 文字轉語音）
 
@@ -47,13 +47,13 @@ Spellophone 的 source archive 另含 `vendor/patches/0001-deterministic-diction
 - 作者：nk2028 專案。
 - 授權：[MIT](vendor/opencc-js/LICENSE)；內嵌的 OpenCC 字典資料為 Apache-2.0（[THIRD_PARTY_LICENSES.md](vendor/opencc-js/THIRD_PARTY_LICENSES.md)）。
 - 上游：[nk2028/opencc-js](https://github.com/nk2028/opencc-js)。
-- 固定版本：npm [opencc-js@1.4.2](https://registry.npmjs.org/opencc-js/-/opencc-js-1.4.2.tgz)（套件 SHA-256 `acde2ed46fecc53eb1c329ff093886bf702975be24ace4caa3d01321167d69c8`，2026-08-22 發布）。保留 `dist/umd/t2cn.js`（SHA-256 `5009384a6bdc904babee967a8bb9928e3c92288ec8a89ed036d53257e74cd8ab`），未修改。試點頁以 `{ from: 'tw', to: 'cn' }` 做字級繁轉簡，不做詞彙轉換（不會把「軟體」改成「软件」）。
+- 固定版本：npm [opencc-js@1.4.2](https://registry.npmjs.org/opencc-js/-/opencc-js-1.4.2.tgz)（套件 SHA-256 `acde2ed46fecc53eb1c329ff093886bf702975be24ace4caa3d01321167d69c8`，2026-08-22 發布）。保留 `dist/umd/t2cn.js`（SHA-256 `5009384a6bdc904babee967a8bb9928e3c92288ec8a89ed036d53257e74cd8ab`），未修改。Worker 以 `{ from: 'tw', to: 'cn' }` 做字級繁轉簡，不做詞彙轉換（不會把「軟體」改成「软件」）。
 
 ## 語音模型：vits-piper-zh_CN-chaowen-medium-int8（超文）
 
 - 來源：sherpa-onnx `tts-models` release 資產 [vits-piper-zh_CN-chaowen-medium-int8.tar.bz2](https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-zh_CN-chaowen-medium-int8.tar.bz2)（SHA-256 `f5f7c8628427fbb259ea4b7ec1a9a822a0c04e3f267071f0abfa0610371d9e0c`）。原始語音為 Piper 的 [rhasspy/piper-voices `zh/zh_CN/chaowen/medium`](https://huggingface.co/rhasspy/piper-voices/tree/main/zh/zh_CN/chaowen/medium)，由 sherpa-onnx 轉為 int8 並附上 lexicon 版文字前端。
 - 檔案：`zh_CN-chaowen-medium.onnx`（SHA-256 `d5ad252f165b26bcecb01759d07cc6cf4cf14045bac8752947a5fb35080c5e6b`）、`zh_CN-chaowen-medium.onnx.json`、`tokens.txt`、`lexicon.txt`（SHA-256 `003e76f89fec389ec109b557f47cc315a1ac31a99091f0cc9d15949f9024416b`，與上游另行發布的 `lexicon-zh-g2pw.txt` 相同）、`phone.fst`、`date.fst`、`number.fst`、`MODEL_CARD`，皆未修改。
-- 授權：rhasspy/piper-voices 儲存庫標示 MIT；MODEL_CARD 記載資料集為 [OHF-Voice/voice-datasets](https://github.com/OHF-Voice/voice-datasets)（CC0），但模型為「Finetuned from Xiao Ya voice」，而小雅（xiao_ya）的 MODEL_CARD 標示其資料集 Data-Baker BZNSYP 為 Non-commercial use。微調後的權重是否承襲非商用限制，上游未說明；本專案視為**未釐清**，目前僅供本機試點評估，公開部署前需另行確認。`lexicon.txt` 的產生方式與授權未查證。
+- 授權：rhasspy/piper-voices 儲存庫標示 MIT；MODEL_CARD 記載資料集為 [OHF-Voice/voice-datasets](https://github.com/OHF-Voice/voice-datasets)（CC0），但模型為「Finetuned from Xiao Ya voice」，而小雅（xiao_ya）的 MODEL_CARD 標示其資料集 Data-Baker BZNSYP 為 Non-commercial use。微調後的權重是否承襲非商用限制，上游未說明；本專案視為**未釐清**；自 2026-10-24 起在自由輸入預設使用此模型（個人診間用途、非商業），模型檔也隨本網站與公開 repo 一併散布；授權邊界仍待向上游確認。`lexicon.txt` 的產生方式與授權未查證。
 
 ## 語音模型：vits-icefall-zh-aishell3
 
@@ -61,4 +61,4 @@ Spellophone 的 source archive 另含 `vendor/patches/0001-deterministic-diction
 - 檔案：`model.onnx`（SHA-256 `5511d651b7840c0a93a6bbfd4afd070a2c7f39ca1ec3ff2ecd73191519bbb852`）、`tokens.txt`、`lexicon.txt`、`speakers.txt`、`phone.fst`、`date.fst`、`number.fst`、`new_heteronym.fst`，皆未修改。資產內 180 MB 的 `rule.far` 文字正規化規則未納入。
 - 授權：icefall 為 Apache-2.0；AISHELL-3 語料（OpenSLR SLR93）標示 Apache License v.2.0。此模型取樣率 8 kHz、174 位說話者。
 
-試點頁的輸入文字只在網頁與本機 Worker 間傳遞，引擎與模型皆由本網站提供，不會送至任何語音服務。
+自由輸入與試點頁的輸入文字只在網頁與本機 Worker 間傳遞，引擎與模型皆由本網站提供，不會送至任何語音服務。

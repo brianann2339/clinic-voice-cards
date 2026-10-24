@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#17594f">
   <title>離線神經語音試點 · 診間語音</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=13">
+  <link rel="stylesheet" href="./styles.css?v=14">
   <style>
     main{max-width:760px;padding-bottom:48px}
     .preview-note{font-size:15px;line-height:1.8;color:var(--muted)}
@@ -51,7 +51,7 @@
     <header class="hero">
       <div class="brand"><img class="brand-mark" src="./icon.svg" alt=""><span>VOICE CARDS</span></div>
       <div class="heading-row"><h1>離線神經語音試點<span>在這台裝置上即時合成國語。</span></h1></div>
-      <p class="preview-note">這一頁會下載語音引擎與模型到瀏覽器，在本機合成 WAV 後用一般播放器播出；文字不會離開這台裝置。第一次載入約需下載 <span id="expected-size">—</span>，之後每次開啟都會重新下載（尚未加入離線快取）。請先按「載入引擎」，再點測試句或自己輸入。</p>
+      <p class="preview-note">這一頁會下載語音引擎與模型到瀏覽器，在本機合成 WAV 後用一般播放器播出；文字不會離開這台裝置。第一次載入約需下載 <span id="expected-size">—</span>，若這台裝置已開過正式頁（已安裝 Service Worker），超文的引擎與模型檔會和正式頁共用離線快取；本頁本身不支援離線開啟，AISHELL-3 每次重新下載。請先按「載入引擎」，再點測試句或自己輸入。</p>
     </header>
 
     <section class="pilot-card" aria-labelledby="engine-title">
@@ -89,9 +89,9 @@
       <pre id="autotest-json"></pre>
     </details>
 
-    <p class="preview-note" style="margin-top:24px">說明：合成前會先把英文字母改寫成國語讀音（例如 X → 艾克斯），再用 OpenCC 把繁體字轉成簡體字送進引擎（模型詞典只有簡體多字詞；「音樂、銀行、長大、還是」在繁體下會念錯），畫面上會列出每一步的文字。數字由引擎內建規則轉成中文讀法。</p>
-    <a class="preview-link" href="./?v=13#typing">← 回到診間語音卡片</a>
-    <footer class="page-footer"><span>引擎：<a href="https://github.com/k2-fsa/sherpa-onnx">sherpa-onnx 2.0.0</a>（WebAssembly）· 繁轉簡：<a href="https://github.com/nk2028/opencc-js">opencc-js 1.4.2</a></span><span>試點頁，未整合進自由輸入</span></footer>
+    <p class="preview-note" style="margin-top:24px">說明：本頁會先把英文字母改寫成國語讀音（例如 X → 艾克斯），再用 OpenCC 把繁體字轉成簡體字；Worker 收到後還會再做一次正規化（全形數字與符號轉半形、%／℃／°／大於小於、千分位、時刻、7 位以上數字逐字唸、常見單位如 mg、ml）並再轉簡體，與正式頁相同，結果卡片會另列「Worker 再正規化後實收」。數字由引擎內建規則轉成中文讀法。</p>
+    <a class="preview-link" href="./?v=14#typing">← 回到診間語音卡片</a>
+    <footer class="page-footer"><span>引擎：<a href="https://github.com/k2-fsa/sherpa-onnx">sherpa-onnx 2.0.0</a>（WebAssembly）· 繁轉簡：<a href="https://github.com/nk2028/opencc-js">opencc-js 1.4.2</a></span><span>超文已用於自由輸入；本頁供比較與量測</span></footer>
   </main>
 
   <script src="./vendor/opencc-js/t2cn.js"></script>
@@ -116,7 +116,7 @@
     };
     const WASM_BYTES = 13740219;
     const SENTENCES = ['你好，請稍等。', 'X光都正常，沒有骨折。', '音樂、銀行、長大、睡覺、還是'];
-    const LETTERS = { A: '诶', B: '比', C: '西', D: '迪', E: '衣', F: '艾弗', G: '吉', H: '艾區', I: '愛', J: '杰', K: '開', L: '艾歐', M: '艾姆', N: '恩', O: '歐', P: '批', Q: '克優', R: '阿', S: '艾斯', T: '踢', U: '優', V: '微', W: '達不溜', X: '艾克斯', Y: '歪', Z: '賊' };
+    const LETTERS = { A: '誒', B: '比', C: '西', D: '迪', E: '衣', F: '艾弗', G: '吉', H: '艾區', I: '愛', J: '杰', K: '開', L: '艾歐', M: '艾姆', N: '恩', O: '歐', P: '批', Q: '克優', R: '阿', S: '艾斯', T: '踢', U: '優', V: '微', W: '達不溜', X: '艾克斯', Y: '歪', Z: '賊' };
 
     const params = new URLSearchParams(location.search);
     const autotest = params.get('autotest') === '1';
@@ -258,7 +258,7 @@
       return new Promise(resolve => {
         if (!state.ready || state.busy) { resolve(null); return; }
         const text = prepareText(raw);
-        if (!/[\p{Script=Han}0-9]/u.test(text.simplified)) { speakStatus.textContent = '請先輸入要唸的文字（只有標點或空白時不合成）。'; resolve(null); return; }
+        if (!/[\p{Script=Han}0-9０-９]/u.test(text.simplified)) { speakStatus.textContent = '請先輸入要唸的文字（只有標點或空白時不合成）。'; resolve(null); return; }
         const id = state.nextId++;
         const sid = Number(speakerId.value) || 0;
         state.pending.set(id, { text, sid, resolve, startedAt: performance.now() });
@@ -279,6 +279,7 @@
       const steps = [['原文', job.text.original]];
       if (job.text.lettered !== job.text.original) steps.push(['字母改寫', job.text.lettered]);
       if (job.text.simplified !== job.text.lettered) steps.push(['送入引擎（繁轉簡）', job.text.simplified]); else steps.push(['送入引擎', job.text.simplified]);
+      if (message.text && message.text !== job.text.simplified) steps.push(['Worker 再正規化後實收', message.text]);
       card.innerHTML = `<h3></h3><dl class="pipeline"></dl><p class="metrics"></p><button class="speak-button" type="button">▶ 播放</button><audio controls playsinline preload="auto"></audio><p class="status"></p>`;
       card.querySelector('h3').textContent = job.text.original;
       const pipeline = card.querySelector('.pipeline');

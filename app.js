@@ -46,6 +46,9 @@ const customText = document.querySelector('#custom-text');
 const customSubmit = document.querySelector('#custom-submit');
 const voiceSelect = document.querySelector('#custom-voice');
 const voiceStatus = document.querySelector('#voice-status');
+const voiceTest = document.querySelector('#voice-test');
+const offlineStatus = document.querySelector('#offline-status');
+const CACHE_NAME = 'clinic-voice-cards-v14';
 const synth = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window ? window.speechSynthesis : null;
 let voices = [];
 let preferredVoice = '';
@@ -57,6 +60,15 @@ let activeUtterance;
 let activeBlobUrl;
 let localWorker;
 let localRequest = null;
+let neuralWorker;
+let neuralReady;
+let neuralState = 'idle';
+let neuralError = '';
+let neuralProgress = '';
+let neuralRequest = null;
+let swRegistration = Promise.resolve(null);
+let offlineReport = null;
+let booted = false;
 let playRequest = 0;
 let playbackState = '準備好了';
 const queue = [];
@@ -108,6 +120,7 @@ function stopPlayback() {
     localWorker = null;
     localRequest = null;
   }
+  neuralRequest = null;
   if (Number.isFinite(audio.duration)) audio.currentTime = 0;
   clearActive();
   playbackState = '已停止';
@@ -250,6 +263,141 @@ function playLocal(phrase, request) {
   }
 }
 
+function startNeural(wasm) {
+  return new Promise((resolve, reject) => {
+    neuralWorker?.terminate();
+    const worker = new Worker('./neural-tts-worker.js');
+    const loaded = {};
+    neuralWorker = worker;
+    worker.onmessage = event => {
+      const message = event.data;
+      if (worker !== neuralWorker) return;
+      if (message.type === 'progress') {
+        loaded[message.file] = message.loaded;
+        const progress = (Object.values(loaded).reduce((sum, value) => sum + value, 0) / 1048576).toFixed(1) + ' / ' + (NEURAL_BYTES / 1048576).toFixed(1) + ' MB';
+        if (progress === neuralProgress) return;
+        neuralProgress = progress;
+        updateVoiceStatus();
+      } else if (message.type === 'ready') {
+        resolve();
+      } else if (message.type === 'error' && message.stage === 'load') {
+        reject(new Error(String(message.message).split('\n')[0]));
+      } else if (message.id !== neuralRequest || message.id !== playRequest) {
+        return;
+      } else if (message.type === 'error') {
+        neuralRequest = null;
+        showError(message.id, '語音未能合成，待播已清空。請改寫句子再試，或改選其他聲音。');
+      } else if (message.type === 'result') {
+        neuralRequest = null;
+        const skipped = [...new Set((message.log || []).map(line => (/Ignore OOV '(.*)'/.exec(line) || [])[1]).filter(char => char && !/[\p{Ps}\p{Pe}\p{Pi}\p{Pf}\p{Pd}\s～〜…]/u.test(char)))];
+        if (skipped.length) nowPlaying.textContent += '（無法朗讀：' + skipped.join('') + '）';
+        activeBlobUrl = URL.createObjectURL(new Blob([message.wav], { type: 'audio/wav' }));
+        playAudio(activeBlobUrl, message.id);
+      }
+    };
+    worker.onerror = event => {
+      if (worker !== neuralWorker) return;
+      const message = event.message || 'Worker 錯誤';
+      worker.terminate();
+      neuralWorker = null;
+      reject(new Error(message));
+      if (neuralState !== 'ready') return;
+      const request = neuralRequest;
+      neuralReady = null;
+      neuralRequest = null;
+      neuralState = 'failed';
+      neuralError = message;
+      updateVoiceStatus();
+      updateCustomSubmit();
+      updateOfflineStatus();
+      if (request !== null) showError(request, '語音未能合成，待播已清空。請改選「備用機械語音」後再送出一次。');
+    };
+    worker.postMessage({ type: 'load', model: NEURAL_MODEL, wasm });
+  });
+}
+
+function whenControlled() {
+  if (!('serviceWorker' in navigator)) return Promise.resolve();
+  return new Promise(resolve => {
+    const timer = setTimeout(() => {
+      navigator.serviceWorker.removeEventListener('message', onMessage);
+      resolve();
+    }, 30000);
+    function onMessage(event) {
+      if (event.data?.cache !== CACHE_NAME) return;
+      navigator.serviceWorker.removeEventListener('message', onMessage);
+      clearTimeout(timer);
+      resolve();
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    swRegistration.then(registration => {
+      if (!registration) {
+        resolve();
+        return;
+      }
+      const watch = worker => worker?.addEventListener('statechange', () => { if (worker.state === 'redundant') resolve(); });
+      watch(registration.installing || registration.waiting);
+      registration.addEventListener('updatefound', () => watch(registration.installing));
+      if (!registration.installing && !registration.waiting && !navigator.serviceWorker.controller) resolve();
+    }, resolve);
+    checkOfflineReady();
+  });
+}
+
+function ensureNeural() {
+  if (neuralReady) return neuralReady;
+  neuralState = 'loading';
+  neuralProgress = '';
+  updateVoiceStatus();
+  updateCustomSubmit();
+  neuralReady = whenControlled()
+    .then(() => startNeural('standard').catch(error => startNeural('lowmem').catch(retryError => {
+      throw new Error(error.message + '；改用縮減記憶體重試：' + retryError.message);
+    })))
+    .then(() => {
+      neuralState = 'ready';
+      updateVoiceStatus();
+      updateCustomSubmit();
+      checkOfflineReady();
+    }, error => {
+      neuralWorker?.terminate();
+      neuralWorker = null;
+      neuralReady = null;
+      neuralState = 'failed';
+      neuralError = error.message;
+      if (voiceSelect.value === NEURAL_VOICE) voiceSelect.value = LOCAL_VOICE;
+      updateVoiceStatus();
+      updateCustomSubmit();
+      updateOfflineStatus();
+      throw error;
+    });
+  return neuralReady;
+}
+
+function playNeural(phrase, request) {
+  if (neuralState === 'failed') {
+    playLocal(phrase, request);
+    return;
+  }
+  neuralRequest = request;
+  if (neuralState !== 'ready') {
+    playbackState = '正在準備語音引擎';
+    updateQueue();
+  }
+  ensureNeural().then(() => {
+    if (request !== playRequest || request !== neuralRequest) return;
+    playbackState = '正在合成語音';
+    updateQueue();
+    neuralWorker.postMessage({ type: 'generate', id: request, text: phrase.text, speed: 1 });
+  }, () => {
+    if (request !== playRequest || request !== neuralRequest) return;
+    neuralRequest = null;
+    playbackState = '正在合成語音';
+    updateQueue();
+    playLocal(phrase, request);
+  });
+}
+
 function playPhrase(phrase, card) {
   const request = ++playRequest;
   audio.pause();
@@ -261,12 +409,14 @@ function playPhrase(phrase, card) {
     card.classList.add('is-active');
     card.setAttribute('aria-pressed', 'true');
   }
-  playbackState = phrase.file ? '載入語音' : phrase.engine === 'local' ? '正在合成語音' : '準備朗讀';
+  playbackState = phrase.file ? '載入語音' : phrase.engine ? '正在合成語音' : '準備朗讀';
   updateQueue();
   nowPlaying.textContent = phrase.text;
   nowPlaying.classList.toggle('is-custom', !phrase.file);
   stopButton.disabled = false;
-  if (phrase.engine === 'local') {
+  if (phrase.engine === 'neural') {
+    playNeural(phrase, request);
+  } else if (phrase.engine === 'local') {
     playLocal(phrase, request);
   } else if (!phrase.file) {
     playSpeech(phrase, request);
@@ -308,6 +458,9 @@ function enqueuePhrase(phrase, card = null) {
 }
 
 const LOCAL_VOICE = 'local-cmn';
+const NEURAL_VOICE = 'neural-chaowen';
+const NEURAL_MODEL = { dir: './models/vits-piper-zh_CN-chaowen-medium-int8/', model: 'zh_CN-chaowen-medium.onnx', tokens: 'tokens.txt', lexicon: 'lexicon.txt', fsts: ['phone.fst', 'date.fst', 'number.fst'] };
+const NEURAL_BYTES = 13740219 + 18652796 + 2064505 + 88630 + 64482 + 59154 + 485;
 let voicesSettled = !synth;
 
 function voiceLangScore(voice) {
@@ -345,22 +498,32 @@ function describeVoice(voice) {
 }
 
 function updateCustomSubmit() {
-  customSubmit.disabled = !customText.value.trim() || (voiceSelect.value !== LOCAL_VOICE && !voices.some(voice => voice.voiceURI === voiceSelect.value));
+  const waiting = voiceSelect.value === NEURAL_VOICE && neuralState !== 'ready';
+  customSubmit.disabled = waiting || !customText.value.trim() || (voiceSelect.value !== LOCAL_VOICE && voiceSelect.value !== NEURAL_VOICE && !voices.some(voice => voice.voiceURI === voiceSelect.value));
+  voiceTest.disabled = waiting;
 }
 
 function updateVoiceStatus() {
+  if (voiceSelect.value === NEURAL_VOICE) {
+    voiceStatus.textContent = neuralState === 'ready'
+      ? '超文（預設）：在這台裝置上合成的國語女聲，清晰但帶大陸口音；文字不會外傳，音量依播放設定。聲線與固定卡片的男聲不同。'
+      : neuralState === 'failed'
+        ? '語音引擎無法使用：' + neuralError + '。請改選「備用機械語音」，或連網重新開啟頁面。'
+        : (neuralProgress ? '正在下載語音引擎 ' + neuralProgress + '…' : '正在準備語音引擎…') + '首次需連網下載約 33 MB，之後由快取供應。就緒前「加入播放」與「試聽」暫停使用，請先用固定卡片，或改選「備用機械語音」。文字不會外傳。';
+    return;
+  }
   if (voiceSelect.value === LOCAL_VOICE) {
-    voiceStatus.textContent = voices.length
-      ? '備用機械語音（預設）：聲調與斷句常不準，但可離線、音量依播放設定；文字不會外傳。上方的裝置語音在 iPad Safari 上可能無聲，改選前請先按「試聽」。'
-      : !synth
-        ? '這個瀏覽器未提供語音朗讀功能（iPad 開啟「鎖定模式」時會如此，備用機械語音也可能無法載入）；請先用固定卡片。文字不會外傳。'
-        : voicesSettled
-          ? '這台裝置沒有可用的中文系統語音，暫以備用機械語音朗讀（聲音生硬、聲調可能不準）。文字不會外傳。'
-          : '正在讀取裝置語音…目前先用備用機械語音；文字不會外傳。';
+    voiceStatus.textContent = (neuralState === 'failed' ? '語音引擎載入失敗（' + neuralError + '），已改用' : '')
+      + '備用機械語音：聲調與斷句常不準，但可離線、音量依播放設定；文字不會外傳。'
+      + (voices.length
+        ? '上方的裝置語音在 iPad Safari 上可能無聲，改選前請先按「試聽」。'
+        : !synth
+          ? '這個瀏覽器未提供語音朗讀功能（iPad 開啟「鎖定模式」時會如此，合成語音也可能無法載入）；請先用固定卡片。'
+          : voicesSettled ? '這台裝置沒有可用的中文系統語音。' : '正在讀取裝置語音…');
     return;
   }
   const voice = voices.find(voice => voice.voiceURI === voiceSelect.value);
-  voiceStatus.textContent = '使用裝置內建語音「' + (voice ? voice.name : '') + '」朗讀，文字不會外傳；聲線與固定卡片的男聲不同。看診前請先按「試聽」確認聽得到；音量請用裝置音量鍵調整。若完全沒聲音，請先確認裝置未開啟靜音；仍無聲時改選選單最後的「備用機械語音」。';
+  voiceStatus.textContent = '使用裝置內建語音「' + (voice ? voice.name : '') + '」朗讀，文字不會外傳；聲線與固定卡片的男聲不同。看診前請先按「試聽」確認聽得到；音量請用裝置音量鍵調整。若完全沒聲音，請先確認裝置未開啟靜音；仍無聲時改選「超文」或「備用機械語音」。';
 }
 
 function refreshVoices() {
@@ -368,6 +531,10 @@ function refreshVoices() {
   voices = synth ? synth.getVoices().filter(isMandarinVoice).sort(compareVoices) : [];
   if (voices.length) voicesSettled = true;
   voiceSelect.replaceChildren();
+  const neuralOption = document.createElement('option');
+  neuralOption.value = NEURAL_VOICE;
+  neuralOption.textContent = '超文 · 國語女聲（預設）';
+  voiceSelect.append(neuralOption);
   for (const voice of voices) {
     const option = document.createElement('option');
     option.value = voice.voiceURI;
@@ -376,18 +543,21 @@ function refreshVoices() {
   }
   const localOption = document.createElement('option');
   localOption.value = LOCAL_VOICE;
-  localOption.textContent = !synth ? '備用機械語音（瀏覽器未提供語音朗讀）' : voices.length || !voicesSettled ? '備用機械語音（相容模式）' : '備用機械語音（此裝置沒有中文系統語音）';
+  localOption.textContent = '備用機械語音';
   voiceSelect.append(localOption);
-  voiceSelect.value = voices.find(voice => voice.voiceURI === preferredVoice)?.voiceURI
-    || voices.find(voice => previous && voice.name === previous.name && voice.lang === previous.lang)?.voiceURI
-    || LOCAL_VOICE;
+  voiceSelect.value = preferredVoice === LOCAL_VOICE || (preferredVoice === NEURAL_VOICE && neuralState !== 'failed') ? preferredVoice
+    : voices.find(voice => voice.voiceURI === preferredVoice)?.voiceURI
+      || voices.find(voice => previous && voice.name === previous.name && voice.lang === previous.lang)?.voiceURI
+      || (neuralState === 'failed' ? LOCAL_VOICE : NEURAL_VOICE);
   voiceSelect.disabled = false;
   document.querySelector('#reload-voices').hidden = !synth || voices.length > 0 || !voicesSettled;
+  if (booted && voiceSelect.value === NEURAL_VOICE && neuralState === 'idle') ensureNeural().catch(() => {});
   updateVoiceStatus();
   updateCustomSubmit();
+  updateOfflineStatus();
 }
 
-try { preferredVoice = localStorage.getItem('voice-card-voice-v12') || ''; } catch {}
+try { preferredVoice = localStorage.getItem('voice-card-voice-v14') || ''; } catch {}
 if (synth) {
   synth.addEventListener('voiceschanged', refreshVoices);
   for (const delay of [300, 1000]) setTimeout(() => { if (!voices.length) refreshVoices(); }, delay);
@@ -396,9 +566,11 @@ if (synth) {
 refreshVoices();
 voiceSelect.addEventListener('change', () => {
   preferredVoice = voiceSelect.value;
-  try { localStorage.setItem('voice-card-voice-v12', preferredVoice); } catch {}
+  try { localStorage.setItem('voice-card-voice-v14', preferredVoice); } catch {}
+  if (preferredVoice === NEURAL_VOICE) ensureNeural().catch(() => {});
   updateVoiceStatus();
   updateCustomSubmit();
+  updateOfflineStatus();
 });
 document.querySelector('#reload-voices').addEventListener('click', refreshVoices);
 customText.addEventListener('input', updateCustomSubmit);
@@ -409,8 +581,9 @@ document.querySelector('#custom-clear').addEventListener('click', () => {
 });
 function enqueueCustom(text) {
   const voiceURI = voiceSelect.value;
-  if (voiceURI === LOCAL_VOICE) {
-    enqueuePhrase({ text, engine: 'local' });
+  if (voiceURI === NEURAL_VOICE && neuralState !== 'ready') return;
+  if (voiceURI === NEURAL_VOICE || voiceURI === LOCAL_VOICE) {
+    enqueuePhrase({ text, engine: voiceURI === NEURAL_VOICE ? 'neural' : 'local' });
     return;
   }
   const voice = voices.find(voice => voice.voiceURI === voiceURI);
@@ -502,15 +675,24 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) stopP
 window.addEventListener('pagehide', stopPlayback);
 document.addEventListener('keydown', event => { if (event.key === 'Escape') stopPlayback(); });
 
+function checkOfflineReady() {
+  navigator.serviceWorker?.controller?.postMessage('check-offline-ready');
+}
+function updateOfflineStatus() {
+  if (!offlineReport) return;
+  offlineStatus.textContent = offlineReport.neural ? '卡片與語音引擎已備妥 · 可離線使用'
+    : voiceSelect.value === NEURAL_VOICE ? '卡片已備妥 · 語音引擎下載完成後可離線使用' : '卡片與備用語音已備妥 · 可離線使用';
+}
 if ('serviceWorker' in navigator) {
-  const checkOfflineReady = () => navigator.serviceWorker.controller?.postMessage('check-offline-ready');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.cache === 'clinic-voice-cards-v13') {
-      document.querySelector('#offline-status').textContent = '卡片與備用語音已備妥 · 可離線使用';
-    }
+    if (event.data?.cache !== CACHE_NAME) return;
+    offlineReport = event.data;
+    updateOfflineStatus();
   });
   navigator.serviceWorker.addEventListener('controllerchange', checkOfflineReady);
   checkOfflineReady();
-  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-    .then(() => navigator.serviceWorker.ready).then(checkOfflineReady).catch(() => {});
+  swRegistration = navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+  swRegistration.then(() => navigator.serviceWorker.ready).then(checkOfflineReady).catch(() => {});
 }
+booted = true;
+if (voiceSelect.value === NEURAL_VOICE && (!preferredVoice || preferredVoice === NEURAL_VOICE)) ensureNeural().catch(() => {});
