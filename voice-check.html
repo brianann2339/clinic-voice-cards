@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17594f">
+  <title>系統語音診斷 · 診間語音</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=12">
+  <style>
+    main{max-width:760px;padding-bottom:48px}.check-grid{display:grid;gap:12px;margin-top:24px}.check-grid button{width:100%;min-height:56px;text-align:left}.check-note{font-size:15px;line-height:1.8;color:var(--muted)}.check-log{margin-top:24px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--white);font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;min-height:120px}.check-info{font-size:13px;line-height:1.7;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="brand"><img class="brand-mark" src="./icon.svg" alt=""><span>VOICE CARDS</span></div>
+      <div class="heading-row"><h1>系統語音診斷<span>每個按鈕按一次，記下有沒有聲音。</span></h1></div>
+      <p class="check-note">這一頁不送出任何資料。請把裝置音量調高，依序按下每個按鈕，聽完後記下「有聲」或「無聲」，再把下方紀錄的文字一起回報。</p>
+    </header>
+    <p id="info" class="check-info">正在讀取語音清單…</p>
+    <div class="check-grid">
+      <button class="speak-button" data-test="a" type="button">A　美佳（指定語音物件）</button>
+      <button class="speak-button" data-test="b" type="button">B　只指定 zh-TW，不指定語音物件</button>
+      <button class="speak-button" data-test="c" type="button">C　英文語音（Samantha 或任一 en-US）</button>
+      <button class="speak-button" data-test="d" type="button">D　先把 audioSession 設成 playback，再唸美佳</button>
+      <button class="speak-button" data-test="e" type="button">E　先播 1 秒無聲音檔，播放中唸美佳</button>
+      <button class="speak-button" data-test="f" type="button">F　婷婷（zh-CN）</button>
+      <button class="quiet-button" data-test="stop" type="button">停止所有朗讀</button>
+    </div>
+    <div id="log" class="check-log">尚未開始。</div>
+    <a class="preview-link" href="./?v=12#typing">← 回到診間語音卡片</a>
+  </main>
+  <audio id="silent" playsinline></audio>
+  <script>
+    const synth = window.speechSynthesis;
+    const info = document.querySelector('#info');
+    const logBox = document.querySelector('#log');
+    const lines = [];
+    const t0 = performance.now();
+    let voices = [];
+    const stamp = () => String(Math.round(performance.now() - t0)).padStart(6, ' ') + 'ms ';
+    function log(text) {
+      lines.push(stamp() + text);
+      logBox.textContent = lines.slice(-40).join('\n');
+    }
+    function describe(v) { return v.name + ' | ' + v.lang + ' | ' + v.voiceURI + ' | local=' + v.localService + ' default=' + v.default; }
+    function refresh() {
+      voices = synth ? synth.getVoices() : [];
+      const zh = voices.filter(v => /^zh/i.test(v.lang));
+      const en = voices.filter(v => /^en/i.test(v.lang));
+      info.textContent = [
+        'userAgent: ' + navigator.userAgent,
+        'speechSynthesis: ' + (synth ? '有' : '無') + '　navigator.audioSession: ' + ('audioSession' in navigator ? '有（type=' + navigator.audioSession.type + '）' : '無'),
+        '語音總數 ' + voices.length + '；中文 ' + zh.length + '；英文 ' + en.length,
+        ...zh.map(describe)
+      ].join('\n');
+    }
+    if (synth) {
+      synth.addEventListener('voiceschanged', refresh);
+      for (const delay of [300, 1000, 3000]) setTimeout(() => { if (!voices.length) refresh(); }, delay);
+    }
+    refresh();
+    const pick = test => voices.find(test);
+    function speak(label, text, setup) {
+      if (!synth) { log(label + '：此瀏覽器沒有 speechSynthesis'); return; }
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1;
+      u.pitch = 1;
+      u.volume = 1;
+      const detail = setup(u) || '';
+      window.__keep = u;
+      const start = performance.now();
+      u.onstart = () => log(label + '：start（' + Math.round(performance.now() - start) + 'ms）');
+      u.onend = () => log(label + '：end（' + Math.round(performance.now() - start) + 'ms）→ 請記下有聲／無聲');
+      u.onerror = event => log(label + '：error ' + event.error);
+      synth.speak(u);
+      log(label + '：已呼叫 speak ' + detail + '　speaking=' + synth.speaking + ' pending=' + synth.pending);
+    }
+    const meijia = () => pick(v => /^zh[-_]TW$/i.test(v.lang) && /mei|美佳|美嘉/i.test(v.name)) || pick(v => /^zh[-_]TW$/i.test(v.lang));
+    const tests = {
+      a(label = 'A') { speak(label, '你好，請稍等。', u => { const v = meijia(); if (!v) return '（找不到 zh-TW 語音）'; u.voice = v; u.lang = v.lang; return '[' + v.name + ']'; }); },
+      b() { speak('B', '你好，請稍等。', u => { u.lang = 'zh-TW'; return '[lang only]'; }); },
+      c() { speak('C', 'Hello, this is a test.', u => { const v = pick(x => /^en[-_]US$/i.test(x.lang) && /samantha/i.test(x.name)) || pick(x => /^en[-_]US$/i.test(x.lang)); if (v) { u.voice = v; u.lang = v.lang; return '[' + v.name + ']'; } u.lang = 'en-US'; return '[lang only]'; }); },
+      d() {
+        if ('audioSession' in navigator) { try { navigator.audioSession.type = 'playback'; log('D：audioSession.type 已設為 ' + navigator.audioSession.type); } catch (e) { log('D：設定 audioSession 失敗 ' + e); } }
+        else log('D：此瀏覽器沒有 navigator.audioSession');
+        tests.a('D');
+      },
+      e() {
+        const audio = document.querySelector('#silent');
+        const samples = 16000;
+        const buf = new ArrayBuffer(44 + samples * 2); const dv = new DataView(buf);
+        const w = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+        w(0, 'RIFF'); dv.setUint32(4, 36 + samples * 2, true); w(8, 'WAVE'); w(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, 16000, true); dv.setUint32(28, 32000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, samples * 2, true);
+        audio.src = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+        audio.play().then(() => log('E：無聲音檔播放中')).catch(err => log('E：音檔播放失敗 ' + err.name));
+        setTimeout(() => tests.a('E'), 300);
+      },
+      f() { speak('F', '你好，請稍等。', u => { const v = pick(x => /^zh[-_]CN$/i.test(x.lang)); if (!v) return '（找不到 zh-CN 語音）'; u.voice = v; u.lang = v.lang; return '[' + v.name + ']'; }); },
+      stop() { if (synth) synth.cancel(); document.querySelector('#silent').pause(); log('已停止'); }
+    };
+    document.querySelectorAll('[data-test]').forEach(button => button.addEventListener('click', () => tests[button.dataset.test]()));
+  </script>
+</body>
+</html>
